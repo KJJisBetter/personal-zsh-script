@@ -22,15 +22,6 @@ install_if_not_installed() {
     fi
 }
 
-# Function to add a path to .zshrc if not already added
-add_to_zshrc_if_not_exists() {
-    local entry="$1"
-    if ! grep -qF "$entry" ~/.zshrc; then
-        echo "$entry" >> ~/.zshrc
-        echo "Added to .zshrc: $entry"
-    fi
-}
-
 # Install zsh if not already installed
 install_if_not_installed zsh
 
@@ -40,14 +31,8 @@ install_if_not_installed unzip
 # Install zoxide if not already installed
 if ! command -v zoxide &> /dev/null; then
     echo "Installing zoxide..."
-    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+    curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
 fi
-
-# Ensure zoxide is initialized in .zshrc
-add_to_zshrc_if_not_exists 'eval "$(zoxide init zsh)"'
-
-# Ensure the alias for cd to z is in .zshrc
-add_to_zshrc_if_not_exists 'alias cd="z"'
 
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
@@ -55,11 +40,8 @@ if ! command -v oh-my-posh &> /dev/null; then
     curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
 fi
 
-# Add Oh My Posh initialization to .zshrc
-add_to_zshrc_if_not_exists 'eval "$(oh-my-posh init zsh --config ~/.zsh-stuff/themes/zen.toml)"'
-
 # Create themes directory and download Zen theme for Oh My Posh
-THEMES_DIR="$HOME/.zsh-stuff/themes"
+THEMES_DIR="$HOME/.config/oh-my-posh/themes"
 check_and_create_dir "$THEMES_DIR"
 
 ZEN_THEME_URL="https://raw.githubusercontent.com/dreamsofautonomy/zen-omp/main/zen.toml"
@@ -84,7 +66,21 @@ if ! command -v bat &> /dev/null && ! command -v batcat &> /dev/null; then
 fi
 
 # Install eza if not already installed
-install_if_not_installed eza
+if ! command -v eza &> /dev/null; then
+    echo "Installing eza..."
+    sudo mkdir -p /etc/apt/keyrings
+    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
+    sudo apt update
+    sudo apt install -y eza
+fi
+
+# Install fzf if not already installed
+if ! command -v fzf &> /dev/null; then
+    echo "Installing fzf..."
+    git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
+    ~/.fzf/install --all
+fi
 
 # Install Zinit if not already installed
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
@@ -93,94 +89,105 @@ if [ ! -d "$ZINIT_HOME" ]; then
     git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
 fi
 
-# Add configurations to .zshrc
-cat << 'EOF' >> ~/.zshrc
-
-# Paths and aliases
-export PATH="/usr/bin:$PATH"
-export PATH="/usr/local/bin:$PATH"
-export PATH="$HOME/.local/bin:$PATH"
-export PATH="$HOME/.local/share:$PATH"
-export PATH=$PATH:/path/to/python
-export PATH=$PATH:/usr/bin/python3
-
-alias ls="eza --icons=always"
-
-# Load Zinit and plugins
-ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
-if [ -d "$ZINIT_HOME" ]; then
-    source "${ZINIT_HOME}/zinit.zsh"
-    zinit light zsh-users/zsh-syntax-highlighting
-    zinit light zsh-users/zsh-completions
-    zinit light zsh-users/zsh-autosuggestions
-    zinit light Aloxaf/fzf-tab
-    zinit snippet OMZP::git
-    zinit snippet OMZP::sudo
-    zinit snippet OMZP::archlinux
-    zinit snippet OMZP::aws
-    zinit snippet OMZP::kubectl
-    zinit snippet OMZP::kubectx
-    zinit snippet OMZP::command-not-found
-    zinit cdreplay -q
+# Clone fzf-git script
+FZF_GIT_DIR="$HOME/.fzf-git"
+if [ ! -d "$FZF_GIT_DIR" ]; then
+    git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR"
 fi
+
+# Add configurations to .zshrc
+cat << 'EOF' > ~/.zshrc
+# Set the directory we want to store zinit and plugins
+ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
+
+# Source/Load zinit
+source "${ZINIT_HOME}/zinit.zsh"
+
+# Add in zsh plugins
+zinit light zsh-users/zsh-syntax-highlighting
+zinit light zsh-users/zsh-completions
+zinit light zsh-users/zsh-autosuggestions
+zinit light Aloxaf/fzf-tab
+
+# Add in snippets
+zinit snippet OMZP::git
+zinit snippet OMZP::sudo
+zinit snippet OMZP::archlinux
+zinit snippet OMZP::aws
+zinit snippet OMZP::kubectl
+zinit snippet OMZP::kubectx
+zinit snippet OMZP::command-not-found
+
+# oh my posh customization for zsh
+eval "$(oh-my-posh init zsh --config ~/.config/oh-my-posh/themes/zen.toml)"
 
 # Load completions
 autoload -Uz compinit && compinit
+
+zinit cdreplay -q
 
 # Keybindings
 bindkey -e
 bindkey '^p' history-search-backward
 bindkey '^n' history-search-forward
 
-# History settings
+# History
 HISTSIZE=5000
 HISTFILE=~/.zsh_history
 SAVEHIST=$HISTSIZE
 HISTDUP=erase
-setopt appendhistory sharehistory hist_ignore_space hist_ignore_all_dups hist_save_no_dups hist_ignore_dups hist_find_no_dups
+setopt appendhistory
+setopt sharehistory
+setopt hist_ignore_space
+setopt hist_ignore_all_dups
+setopt hist_save_no_dups
+setopt hist_ignore_dups
+setopt hist_find_no_dups
 
 # Completion styling
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 zstyle ':completion:*' menu no
-zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls --color $realpath'
-zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
+zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza --tree --color=always {} | head -200'
+zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --tree --color=always {} | head -200'
 
-# Fzf configuration
-export FZF_DEFAULT_COMMAND="fd --hidden --strip-cwd-prefix --exclude .git"
+# Aliases
+alias ls="eza --color=always --long --git --no-filesize --icons=always --no-time --no-user --no-permissions"
+
+# PATHS
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.fzf/bin:$PATH"
+export PATH="/usr/local/bin:$PATH"
+export PATH="/usr/bin:$PATH"
+export PATH="/bin:$PATH"
+
+# FZF configuration
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+export FZF_DEFAULT_COMMAND="fd --type f --hidden --follow --exclude .git"
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
-export FZF_ALT_C_COMMAND="fd --type=d --hidden --strip-cwd-prefix --exclude .git"
+export FZF_ALT_C_COMMAND="fd --type d --hidden --follow --exclude .git"
+
+# FZF options
+export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border"
+export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :500 {}'"
+export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
 
 # Use fd for fzf completion
 _fzf_compgen_path() {
-  fd --hidden --exclude .git . "$1"
+  fd --hidden --follow --exclude ".git" . "$1"
 }
 
 _fzf_compgen_dir() {
-  fd --type=d --hidden --exclude .git . "$1"
+  fd --type d --hidden --follow --exclude ".git" . "$1"
 }
 
-# Set fzf options
-export FZF_CTRL_T_OPTS="--preview 'bat -n --color=always --line-range :500 {}'"
-export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
+# Source fzf-git script
+source ~/.fzf-git/fzf-git.sh
 
-# Advanced fzf customization
-_fzf_comprun() {
-  local command=$1
-  shift
-  case "$command" in
-    cd) fzf --preview 'eza --tree --color=always {} | head -200' "$@" ;;
-    export|unset) fzf --preview "eval 'echo $'{}" "$@" ;;
-    ssh) fzf --preview 'dig {}' "$@" ;;
-    *) fzf --preview "bat -n --color=always --line-range :500 {}" "$@" ;;
-  esac
-}
-
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-
-# Initialize zoxide and Oh My Posh
+# Shell integration
 eval "$(zoxide init zsh)"
-eval "$(oh-my-posh init zsh --config ~/.zsh-stuff/themes/zen.toml)"
+
 EOF
 
 echo "Setup completed. Please restart your terminal or source your .zshrc file."
