@@ -52,7 +52,7 @@ add_to_zshrc_if_not_exists 'alias cd="z"'
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
-    sudo curl -s https://ohmyposh.dev/install.sh | sudo bash -s
+    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
 fi
 
 # Add Oh My Posh initialization to .zshrc
