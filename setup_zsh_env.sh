@@ -118,8 +118,6 @@ zinit snippet OMZP::kubectl
 zinit snippet OMZP::kubectx
 zinit snippet OMZP::command-not-found
 
-# oh my posh customization for zsh
-eval "$(oh-my-posh init zsh --config ~/.config/oh-my-posh/themes/zen.toml)"
 
 # Load completions
 autoload -Uz compinit && compinit
@@ -187,6 +185,9 @@ source ~/.fzf-git/fzf-git.sh
 
 # Shell integration
 eval "$(zoxide init zsh)"
+
+# oh my posh customization for zsh
+eval "$(oh-my-posh init zsh --config ~/.config/oh-my-posh/themes/zen.toml)"
 
 EOF
 
