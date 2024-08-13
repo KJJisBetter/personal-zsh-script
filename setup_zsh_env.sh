@@ -97,8 +97,9 @@ if [ ! -d "$FZF_GIT_DIR" ]; then
     git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR"
 fi
 
-# Add configurations to .zshrc
-cat << 'EOF' > ~/.zshrc
+if [ ! -f ~/.zshrc ] || [ ! -s ~/.zshrc ]; then
+    echo "Creating .zshrc file..."
+    cat << 'EOF' > ~/.zshrc
 # Set the directory we want to store zinit and plugins
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
@@ -161,9 +162,6 @@ export PATH="/usr/local/bin:$PATH"
 export PATH="/usr/bin:$PATH"
 export PATH="/bin:$PATH"
 
-# FZF configuration
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-
 export FZF_DEFAULT_COMMAND="fd --type f --hidden --follow --exclude .git"
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_ALT_C_COMMAND="fd --type d --hidden --follow --exclude .git"
@@ -185,12 +183,12 @@ _fzf_compgen_dir() {
 # Source fzf-git script
 source ~/.fzf-git/fzf-git.sh
 
-# Shell integration
+# Ensure this is at the end of the file
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 eval "$(zoxide init zsh)"
-
-# oh my posh customization for zsh
 eval "$(oh-my-posh init zsh --config ~/.config/oh-my-posh/themes/zen.toml)"
 
 EOF
+fi
 
 echo "Setup completed. Please restart your terminal or source your .zshrc file."
