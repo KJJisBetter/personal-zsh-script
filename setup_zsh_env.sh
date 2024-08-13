@@ -16,7 +16,9 @@ check_and_create_dir() {
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
+    mkdir -p ~/.local/bin
     curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
+    export PATH="$HOME/.local/bin:$PATH"
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
@@ -54,13 +56,97 @@ fi
 
 # Add configurations to .zshrc
 cat << 'EOF' > ~/.zshrc
-# Your existing .zshrc content here
-# ...
+# Set the directory we want to store zinit and plugins
+ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
-# Ensure this is at the end of the file
+# Source/Load zinit
+source "${ZINIT_HOME}/zinit.zsh"
+
+# Add in zsh plugins
+zinit light zsh-users/zsh-syntax-highlighting
+zinit light zsh-users/zsh-completions
+zinit light zsh-users/zsh-autosuggestions
+zinit light Aloxaf/fzf-tab
+
+# Add in snippets
+zinit snippet OMZP::git
+zinit snippet OMZP::sudo
+zinit snippet OMZP::archlinux
+zinit snippet OMZP::aws
+zinit snippet OMZP::kubectl
+zinit snippet OMZP::kubectx
+zinit snippet OMZP::command-not-found
+
+# Load completions
+autoload -Uz compinit && compinit
+
+zinit cdreplay -q
+
+# Keybindings
+bindkey -e
+bindkey '^p' history-search-backward
+bindkey '^n' history-search-forward
+
+# History
+HISTSIZE=5000
+HISTFILE=~/.zsh_history
+SAVEHIST=$HISTSIZE
+HISTDUP=erase
+setopt appendhistory
+setopt sharehistory
+setopt hist_ignore_space
+setopt hist_ignore_all_dups
+setopt hist_save_no_dups
+setopt hist_ignore_dups
+setopt hist_find_no_dups
+
+# Completion styling
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+zstyle ':completion:*' menu no
+zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza --tree --color=always {} | head -200'
+zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --tree --color=always {} | head -200'
+
+# Aliases
+alias ls="eza --color=always --long --git --no-filesize --icons=always --no-time --no-user --no-permissions"
+
+# PATHS
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.fzf/bin:$PATH"
+export PATH="/usr/local/bin:$PATH"
+export PATH="/usr/bin:$PATH"
+export PATH="/bin:$PATH"
+
+# FZF configuration
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+export FZF_DEFAULT_COMMAND="fd --type f --hidden --follow --exclude .git"
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+export FZF_ALT_C_COMMAND="fd --type d --hidden --follow --exclude .git"
+
+# FZF options
+export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border"
+export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :500 {}'"
+export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
+
+# Use fd for fzf completion
+_fzf_compgen_path() {
+  fd --hidden --follow --exclude ".git" . "$1"
+}
+
+_fzf_compgen_dir() {
+  fd --type d --hidden --follow --exclude ".git" . "$1"
+}
+
+# Source fzf-git script
+source ~/.fzf-git/fzf-git.sh
+
+# Shell integration
 eval "$(zoxide init zsh)"
+
+# oh my posh customization for zsh
 eval "$(oh-my-posh init zsh --config ~/.config/oh-my-posh/themes/zen.toml)"
+
 EOF
 
 echo "Zsh configuration completed. Please restart your shell or run 'source ~/.zshrc'."
