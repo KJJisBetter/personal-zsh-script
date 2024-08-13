@@ -2,23 +2,27 @@
 
 set -e
 
-# Get the actual user's home directory
-if [ -n "$SUDO_USER" ]; then
-    REAL_HOME=$(eval echo ~$SUDO_USER)
-else
-    REAL_HOME=$HOME
+# Check if script is run with sudo
+if [ "$EUID" -ne 0 ]; then
+  echo "Please run this script with sudo"
+  exit 1
 fi
+
+# Get the actual user's username and home directory
+ACTUAL_USER=$(logname)
+ACTUAL_HOME=$(eval echo ~$ACTUAL_USER)
+
+# Function to run a command as the actual user
+run_as_user() {
+    sudo -u "$ACTUAL_USER" "$@"
+}
 
 # Function to check and create a directory if it doesn't exist
 check_and_create_dir() {
     local dir_path="$1"
     if [ ! -d "$dir_path" ]; then
-        mkdir -p "$dir_path"
+        run_as_user mkdir -p "$dir_path"
         echo "Created directory at $dir_path"
-        # If running as root, change ownership to the real user
-        if [ $(id -u) -eq 0 ]; then
-            chown $SUDO_USER:$SUDO_USER "$dir_path"
-        fi
     else
         echo "Directory $dir_path already exists."
     fi
@@ -36,7 +40,7 @@ install_if_not_installed() {
 }
 
 # Ensure ~/.local/bin exists
-check_and_create_dir "$REAL_HOME/.local/bin"
+check_and_create_dir "$ACTUAL_HOME/.local/bin"
 
 # Install zsh if not already installed
 install_if_not_installed zsh
@@ -47,26 +51,24 @@ install_if_not_installed unzip
 # Install zoxide if not already installed
 if ! command -v zoxide &> /dev/null; then
     echo "Installing zoxide..."
-    curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
+    run_as_user curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | run_as_user bash
 fi
 
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
-    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d "$REAL_HOME/.local/bin"
-    chown $SUDO_USER:$SUDO_USER "$REAL_HOME/.local/bin/oh-my-posh"
+    run_as_user curl -s https://ohmyposh.dev/install.sh | run_as_user bash -s -- -d "$ACTUAL_HOME/.local/bin"
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
-THEMES_DIR="$REAL_HOME/.config/oh-my-posh/themes"
+THEMES_DIR="$ACTUAL_HOME/.config/oh-my-posh/themes"
 check_and_create_dir "$THEMES_DIR"
 
 ZEN_THEME_URL="https://raw.githubusercontent.com/dreamsofautonomy/zen-omp/main/zen.toml"
 ZEN_THEME_PATH="$THEMES_DIR/zen.toml"
 if [ ! -f "$ZEN_THEME_PATH" ]; then
     echo "Downloading Zen theme for Oh My Posh..."
-    curl -o "$ZEN_THEME_PATH" "$ZEN_THEME_URL"
-    chown $SUDO_USER:$SUDO_USER "$ZEN_THEME_PATH"
+    run_as_user curl -o "$ZEN_THEME_PATH" "$ZEN_THEME_URL"
 else
     echo "Zen theme already exists at $ZEN_THEME_PATH"
 fi
@@ -74,15 +76,15 @@ fi
 # Install fd-find if not installed and create symlink
 if ! command -v fd &> /dev/null; then
     install_if_not_installed fd-find
-    ln -sf $(which fdfind) "$REAL_HOME/.local/bin/fd"
-    chown $SUDO_USER:$SUDO_USER "$REAL_HOME/.local/bin/fd"
+    ln -sf $(which fdfind) "$ACTUAL_HOME/.local/bin/fd"
+    chown $ACTUAL_USER:$ACTUAL_USER "$ACTUAL_HOME/.local/bin/fd"
 fi
 
 # Install bat and create symlink to batcat if not installed
 if ! command -v bat &> /dev/null && ! command -v batcat &> /dev/null; then
     install_if_not_installed bat
-    ln -sf $(which batcat) "$REAL_HOME/.local/bin/bat"
-    chown $SUDO_USER:$SUDO_USER "$REAL_HOME/.local/bin/bat"
+    ln -sf $(which batcat) "$ACTUAL_HOME/.local/bin/bat"
+    chown $ACTUAL_USER:$ACTUAL_USER "$ACTUAL_HOME/.local/bin/bat"
 fi
 
 # Install eza if not already installed
@@ -98,33 +100,30 @@ fi
 # Install fzf if not already installed
 if ! command -v fzf &> /dev/null; then
     echo "Installing fzf..."
-    git clone --depth 1 https://github.com/junegunn/fzf.git "$REAL_HOME/.fzf"
-    chown -R $SUDO_USER:$SUDO_USER "$REAL_HOME/.fzf"
-    sudo -u $SUDO_USER "$REAL_HOME/.fzf/install" --all --no-bash --no-fish
+    run_as_user git clone --depth 1 https://github.com/junegunn/fzf.git "$ACTUAL_HOME/.fzf"
+    run_as_user "$ACTUAL_HOME/.fzf/install" --all --no-bash --no-fish
 fi
 
 # Install Zinit if not already installed
-ZINIT_HOME="${XDG_DATA_HOME:-$REAL_HOME/.local/share}/zinit/zinit.git"
+ZINIT_HOME="${XDG_DATA_HOME:-$ACTUAL_HOME/.local/share}/zinit/zinit.git"
 if [ ! -d "$ZINIT_HOME" ]; then
-    mkdir -p "$(dirname $ZINIT_HOME)"
-    git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
-    chown -R $SUDO_USER:$SUDO_USER "$(dirname $ZINIT_HOME)"
+    run_as_user mkdir -p "$(dirname $ZINIT_HOME)"
+    run_as_user git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
 fi
 
 # Clone fzf-git script
-FZF_GIT_DIR="$REAL_HOME/.fzf-git"
+FZF_GIT_DIR="$ACTUAL_HOME/.fzf-git"
 if [ ! -d "$FZF_GIT_DIR" ]; then
-    git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR"
-    chown -R $SUDO_USER:$SUDO_USER "$FZF_GIT_DIR"
+    run_as_user git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR"
 fi
 
 # Add configurations to .zshrc
-cat << EOF > "$REAL_HOME/.zshrc"
+run_as_user cat << 'EOF' > "$ACTUAL_HOME/.zshrc"
 # Set the directory we want to store zinit and plugins
-ZINIT_HOME="\${XDG_DATA_HOME:-\${HOME}/.local/share}/zinit/zinit.git"
+ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
 # Source/Load zinit
-source "\${ZINIT_HOME}/zinit.zsh"
+source "${ZINIT_HOME}/zinit.zsh"
 
 # Add in zsh plugins
 zinit light zsh-users/zsh-syntax-highlighting
@@ -154,7 +153,7 @@ bindkey '^n' history-search-forward
 # History
 HISTSIZE=5000
 HISTFILE=~/.zsh_history
-SAVEHIST=\$HISTSIZE
+SAVEHIST=$HISTSIZE
 HISTDUP=erase
 setopt appendhistory
 setopt sharehistory
@@ -166,7 +165,7 @@ setopt hist_find_no_dups
 
 # Completion styling
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
-zstyle ':completion:*' list-colors "\${(s.:.)LS_COLORS}"
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 zstyle ':completion:*' menu no
 zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza --tree --color=always {} | head -200'
 zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --tree --color=always {} | head -200'
@@ -175,17 +174,17 @@ zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --tree --color=always {
 alias ls="eza --color=always --long --git --no-filesize --icons=always --no-time --no-user --no-permissions"
 
 # PATHS
-export PATH="\$HOME/.local/bin:\$PATH"
-export PATH="\$HOME/.fzf/bin:\$PATH"
-export PATH="/usr/local/bin:\$PATH"
-export PATH="/usr/bin:\$PATH"
-export PATH="/bin:\$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.fzf/bin:$PATH"
+export PATH="/usr/local/bin:$PATH"
+export PATH="/usr/bin:$PATH"
+export PATH="/bin:$PATH"
 
 # FZF configuration
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 export FZF_DEFAULT_COMMAND="fd --type f --hidden --follow --exclude .git"
-export FZF_CTRL_T_COMMAND="\$FZF_DEFAULT_COMMAND"
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_ALT_C_COMMAND="fd --type d --hidden --follow --exclude .git"
 
 # FZF options
@@ -195,24 +194,22 @@ export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
 
 # Use fd for fzf completion
 _fzf_compgen_path() {
-  fd --hidden --follow --exclude ".git" . "\$1"
+  fd --hidden --follow --exclude ".git" . "$1"
 }
 
 _fzf_compgen_dir() {
-  fd --type d --hidden --follow --exclude ".git" . "\$1"
+  fd --type d --hidden --follow --exclude ".git" . "$1"
 }
 
 # Source fzf-git script
 source ~/.fzf-git/fzf-git.sh
 
 # Shell integration
-eval "\$(zoxide init zsh)"
+eval "$(zoxide init zsh)"
 
 # oh my posh customization for zsh
-eval "\$(oh-my-posh init zsh --config ~/.config/oh-my-posh/themes/zen.toml)"
+eval "$(oh-my-posh init zsh --config ~/.config/oh-my-posh/themes/zen.toml)"
 
 EOF
-
-chown $SUDO_USER:$SUDO_USER "$REAL_HOME/.zshrc"
 
 echo "Setup completed. Please restart your terminal or source your .zshrc file."
