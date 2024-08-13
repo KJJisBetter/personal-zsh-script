@@ -39,7 +39,7 @@ fi
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
-    sudo curl -s https://ohmyposh.dev/install.sh | sudo bash -s -- -d ~/.local/bin
+    sudo curl -s https://ohmyposh.dev/install.sh | sudo bash -s -- -d "$HOME/.local/bin"
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
@@ -58,13 +58,13 @@ fi
 # Install fd-find if not installed and create symlink
 if ! command -v fd &> /dev/null; then
     install_if_not_installed fd-find
-    ln -sf $(which fdfind) ~/.local/bin/fd
+    ln -sf $(which fdfind) "$HOME/.local/bin/fd"
 fi
 
 # Install bat and create symlink to batcat if not installed
 if ! command -v bat &> /dev/null && ! command -v batcat &> /dev/null; then
     install_if_not_installed bat
-    ln -sf $(which batcat) ~/.local/bin/bat
+    ln -sf $(which batcat) "$HOME/.local/bin/bat"
 fi
 
 # Install eza if not already installed
@@ -80,8 +80,8 @@ fi
 # Install fzf if not already installed
 if ! command -v fzf &> /dev/null; then
     echo "Installing fzf..."
-    git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
-    ~/.fzf/install --all
+    git clone --depth 1 https://github.com/junegunn/fzf.git "$HOME/.fzf"
+    "$HOME/.fzf/install" --all
 fi
 
 # Install Zinit if not already installed
@@ -98,7 +98,7 @@ if [ ! -d "$FZF_GIT_DIR" ]; then
 fi
 
 # Add configurations to .zshrc
-cat << 'EOF' > ~/.zshrc
+cat << 'EOF' > "$HOME/.zshrc"
 # Set the directory we want to store zinit and plugins
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
@@ -133,7 +133,7 @@ bindkey '^n' history-search-forward
 
 # History
 HISTSIZE=5000
-HISTFILE=~/.zsh_history
+HISTFILE="$HOME/.zsh_history"
 SAVEHIST=$HISTSIZE
 HISTDUP=erase
 setopt appendhistory
@@ -162,7 +162,7 @@ export PATH="/usr/bin:$PATH"
 export PATH="/bin:$PATH"
 
 # FZF configuration
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+[ -f "$HOME/.fzf.zsh" ] && source "$HOME/.fzf.zsh"
 
 export FZF_DEFAULT_COMMAND="fd --type f --hidden --follow --exclude .git"
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
@@ -183,14 +183,15 @@ _fzf_compgen_dir() {
 }
 
 # Source fzf-git script
-source ~/.fzf-git/fzf-git.sh
+source "$HOME/.fzf-git/fzf-git.sh"
 
 # Shell integration
 eval "$(zoxide init zsh)"
 
 # oh my posh customization for zsh
-eval "$(oh-my-posh init zsh --config ~/.config/oh-my-posh/themes/zen.toml)"
+eval "$(oh-my-posh init zsh --config "$HOME/.config/oh-my-posh/themes/zen.toml")"
 
 EOF
 
 echo "Setup completed. Please restart your terminal or source your .zshrc file."
+
