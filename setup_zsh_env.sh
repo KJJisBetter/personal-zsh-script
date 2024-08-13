@@ -144,7 +144,7 @@ fi
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
     mkdir $CORRECT_HOME/.local/bin
-    run_as_user curl -s https://ohmyposh.dev/install.sh | run_as_user bash -s -- -d "$CORRECT_HOME/.local/bin"
+    run_as_user curl -s https://ohmyposh.dev/install.sh | bash -s -- -d "$CORRECT_HOME/.local/bin"
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
