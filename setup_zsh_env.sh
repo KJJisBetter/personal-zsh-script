@@ -80,6 +80,7 @@ fi
 # Install Oh My Posh
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
+    check_and_create_dir ~/.local/bin
     curl -s https://ohmyposh.dev/install.sh | bash -s -- -d "$CORRECT_HOME/.local/bin"
     chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local/bin"
 fi
