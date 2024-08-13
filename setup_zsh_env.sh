@@ -227,6 +227,18 @@ append_to_zshrc() {
 # Add your zshrc content here
 zshrc_content=$(cat << 'EOF'
 
+# Path to the flag file
+FLAG_FILE="$HOME/.zsh_first_run_complete"
+
+# Check if the flag file exists
+if [ ! -f "$FLAG_FILE" ]; then
+    # Display the message
+    echo "Welcome! This message will only appear once. Some dependencies might be installed during the first run."
+
+    # Create the flag file to prevent this message from showing again
+    touch "$FLAG_FILE"
+fi
+
 # Set the directory we want to store zinit and plugins
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
