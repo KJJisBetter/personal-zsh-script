@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # Function to check and create a directory if it doesn't exist
 check_and_create_dir() {
     local dir_path="$1"
@@ -16,11 +18,14 @@ install_if_not_installed() {
     local package="$1"
     if ! command -v "$package" &> /dev/null; then
         echo "Installing $package..."
-        sudo apt update && sudo apt install -y "$package"
+        sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$package"
     else
         echo "$package is already installed."
     fi
 }
+
+# Ensure ~/.local/bin exists
+check_and_create_dir "$HOME/.local/bin"
 
 # Install zsh if not already installed
 install_if_not_installed zsh
@@ -37,7 +42,7 @@ fi
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
-    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
+    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d "$HOME/.local/bin"
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
@@ -56,13 +61,13 @@ fi
 # Install fd-find if not installed and create symlink
 if ! command -v fd &> /dev/null; then
     install_if_not_installed fd-find
-    ln -sf $(which fdfind) ~/.local/bin/fd
+    ln -sf $(which fdfind) "$HOME/.local/bin/fd"
 fi
 
 # Install bat and create symlink to batcat if not installed
 if ! command -v bat &> /dev/null && ! command -v batcat &> /dev/null; then
     install_if_not_installed bat
-    ln -sf $(which batcat) ~/.local/bin/bat
+    ln -sf $(which batcat) "$HOME/.local/bin/bat"
 fi
 
 # Install eza if not already installed
@@ -71,15 +76,15 @@ if ! command -v eza &> /dev/null; then
     sudo mkdir -p /etc/apt/keyrings
     wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
     echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
-    sudo apt update
-    sudo apt install -y eza
+    sudo DEBIAN_FRONTEND=noninteractive apt-get update
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y eza
 fi
 
 # Install fzf if not already installed
 if ! command -v fzf &> /dev/null; then
     echo "Installing fzf..."
-    git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
-    ~/.fzf/install --all
+    git clone --depth 1 https://github.com/junegunn/fzf.git "$HOME/.fzf"
+    "$HOME/.fzf/install" --all --no-bash --no-fish
 fi
 
 # Install Zinit if not already installed
@@ -96,7 +101,7 @@ if [ ! -d "$FZF_GIT_DIR" ]; then
 fi
 
 # Add configurations to .zshrc
-cat << 'EOF' > ~/.zshrc
+cat << 'EOF' > "$HOME/.zshrc"
 # Set the directory we want to store zinit and plugins
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
@@ -117,7 +122,6 @@ zinit snippet OMZP::aws
 zinit snippet OMZP::kubectl
 zinit snippet OMZP::kubectx
 zinit snippet OMZP::command-not-found
-
 
 # Load completions
 autoload -Uz compinit && compinit
@@ -190,6 +194,8 @@ eval "$(zoxide init zsh)"
 eval "$(oh-my-posh init zsh --config ~/.config/oh-my-posh/themes/zen.toml)"
 
 EOF
+
+echo "Setup completed. Please restart your terminal or source your .zshrc file."
 
 echo "Setup completed. Please restart your terminal or source your .zshrc file."
 
