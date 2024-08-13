@@ -2,11 +2,34 @@
 
 set -ex
 
+# Determine the correct user and home directory
+if [ -n "$CODER_USER_NAME" ]; then
+    CORRECT_USER="$CODER_USER_NAME"
+elif [ -n "$SUDO_USER" ]; then
+    CORRECT_USER="$SUDO_USER"
+else
+    CORRECT_USER="$(whoami)"
+fi
+
+CORRECT_HOME="/home/$CORRECT_USER"
+
+# Function to run commands as the correct user
+run_as_user() {
+    if [ "$(whoami)" = "$CORRECT_USER" ]; then
+        "$@"
+    else
+        sudo -H -u "$CORRECT_USER" "$@"
+    fi
+}
+
+echo "Setting up environment for user: $CORRECT_USER"
+echo "Home directory: $CORRECT_HOME"
+
 # Function to check and create a directory if it doesn't exist
 check_and_create_dir() {
     local dir_path="$1"
     if [ ! -d "$dir_path" ]; then
-        mkdir -p "$dir_path"
+        run_as_user mkdir -p "$dir_path"
         echo "Created directory at $dir_path"
     else
         echo "Directory $dir_path already exists."
@@ -18,7 +41,7 @@ install_if_not_installed() {
     local package="$1"
     if ! command -v "$package" &> /dev/null; then
         echo "Installing $package..."
-        apt update && apt-get install -y "$package"
+        sudo apt update && sudo apt-get install -y "$package"
     else
         echo "$package is already installed."
     fi
@@ -33,24 +56,24 @@ install_if_not_installed unzip
 # Install zoxide if not already installed
 if ! command -v zoxide &> /dev/null; then
     echo "Installing zoxide..."
-    curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
+    run_as_user curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | run_as_user bash
 fi
 
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
-    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d "$HOME/.local/bin"
+    run_as_user curl -s https://ohmyposh.dev/install.sh | run_as_user bash -s -- -d "$CORRECT_HOME/.local/bin"
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
-THEMES_DIR="$HOME/.config/oh-my-posh/themes"
+THEMES_DIR="$CORRECT_HOME/.config/oh-my-posh/themes"
 check_and_create_dir "$THEMES_DIR"
 
 ZEN_THEME_URL="https://raw.githubusercontent.com/dreamsofautonomy/zen-omp/main/zen.toml"
 ZEN_THEME_PATH="$THEMES_DIR/zen.toml"
 if [ ! -f "$ZEN_THEME_PATH" ]; then
     echo "Downloading Zen theme for Oh My Posh..."
-    curl -o "$ZEN_THEME_PATH" "$ZEN_THEME_URL"
+    run_as_user curl -o "$ZEN_THEME_PATH" "$ZEN_THEME_URL"
 else
     echo "Zen theme already exists at $ZEN_THEME_PATH"
 fi
@@ -58,58 +81,60 @@ fi
 # Install fd-find if not installed and create symlink
 if ! command -v fd &> /dev/null; then
     install_if_not_installed fd-find
-    ln -sf $(which fdfind) "$HOME/.local/bin/fd"
+    run_as_user ln -sf $(which fdfind) "$CORRECT_HOME/.local/bin/fd"
 fi
 
 # Install bat and create symlink to batcat if not installed
 if ! command -v bat &> /dev/null && ! command -v batcat &> /dev/null; then
     install_if_not_installed bat
-    ln -sf $(which batcat) "$HOME/.local/bin/bat"
+    run_as_user ln -sf $(which batcat) "$CORRECT_HOME/.local/bin/bat"
 fi
 
 # Install eza if not already installed
 if ! command -v eza &> /dev/null; then
     echo "Installing eza..."
-    mkdir -p /etc/apt/keyrings
-    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
-    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | tee /etc/apt/sources.list.d/gierens.list
-    apt update
-    apt install -y eza
+    sudo mkdir -p /etc/apt/keyrings
+    sudo wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
+    sudo apt update
+    sudo apt install -y eza
 fi
 
 # Install fzf if not already installed
 if ! command -v fzf &> /dev/null; then
     echo "Installing fzf..."
-    git clone --depth 1 https://github.com/junegunn/fzf.git "$HOME/.fzf"
-    "$HOME/.fzf/install" --all
+    run_as_user git clone --depth 1 https://github.com/junegunn/fzf.git "$CORRECT_HOME/.fzf"
+    run_as_user "$CORRECT_HOME/.fzf/install" --all
 fi
 
 # Install Zinit if not already installed
-ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
+ZINIT_HOME="${XDG_DATA_HOME:-${CORRECT_HOME}/.local/share}/zinit/zinit.git"
 if [ ! -d "$ZINIT_HOME" ]; then
-    mkdir -p "$(dirname "$ZINIT_HOME")"
-    git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
+    run_as_user mkdir -p "$(dirname "$ZINIT_HOME")"
+    run_as_user git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
 fi
 
 # Clone fzf-git script
-FZF_GIT_DIR="$HOME/.fzf-git"
+FZF_GIT_DIR="$CORRECT_HOME/.fzf-git"
 if [ ! -d "$FZF_GIT_DIR" ]; then
-    git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR"
+    run_as_user git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR"
 fi
 
 # Ensure .zshrc exists and has correct permissions
-ZSHRC="$HOME/.zshrc"
-touch "$ZSHRC"
-chmod 644 "$ZSHRC"
+ZSHRC="$CORRECT_HOME/.zshrc"
+run_as_user touch "$ZSHRC"
+run_as_user chmod 644 "$ZSHRC"
 
 # Function to safely append configurations to .zshrc
 append_to_zshrc() {
     local content="$1"
-    echo "$content" >> "$ZSHRC"
+    run_as_user tee -a "$ZSHRC" > /dev/null << EOF
+$content
+EOF
 }
 
 # Content to add to .zshrc
-append_to_zshrc=$(cat << 'EOF'
+zshrc_content=$(cat << 'EOF'
 
 # Set the directory we want to store zinit and plugins
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
@@ -205,16 +230,14 @@ eval "$(oh-my-posh init zsh --config $HOME/.config/oh-my-posh/themes/zen.toml)"
 EOF
 )
 
-# Ensure correct ownership of user directories
-sudo chown -R $(whoami):$(whoami) "$HOME/.local"
-sudo chown -R $(whoami):$(whoami) "$HOME/.config"
-sudo chown -R $(whoami):$(whoami) "$HOME/.fzf"
-sudo chown -R $(whoami):$(whoami) "$HOME/.fzf-git"
-
 # Append the content to .zshrc
 append_to_zshrc "$zshrc_content"
 
-# Ensure correct ownership of .zshrc
-chown $(whoami):$(whoami) "$ZSHRC"
+# Ensure correct ownership of user directories
+sudo chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local"
+sudo chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.config"
+sudo chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.fzf"
+sudo chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.fzf-git"
+sudo chown "$CORRECT_USER:$CORRECT_USER" "$ZSHRC"
 
-echo "Zsh configuration completed. Please restart your terminal or source your .zshrc file."
+echo "Zsh configuration completed for user $CORRECT_USER. Please restart your terminal or source your .zshrc file."
