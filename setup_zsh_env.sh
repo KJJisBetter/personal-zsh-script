@@ -76,7 +76,28 @@ install_if_not_installed unzip
 # Install zoxide
 if ! command -v zoxide &> /dev/null; then
     echo "Installing zoxide..."
-    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+    ZOXIDE_INSTALL_SCRIPT="$CORRECT_HOME/zoxide_install.sh"
+    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh -o "$ZOXIDE_INSTALL_SCRIPT"
+    chmod +x "$ZOXIDE_INSTALL_SCRIPT"
+    chown "$CORRECT_USER:$CORRECT_USER" "$ZOXIDE_INSTALL_SCRIPT"
+    
+    # Modify the install script to use the correct installation directory
+    sed -i 's|PREFIX=.*|PREFIX="$HOME/.local"|' "$ZOXIDE_INSTALL_SCRIPT"
+    
+    # Run the install script as the correct user
+    sudo -u "$CORRECT_USER" bash -c "HOME=$CORRECT_HOME $ZOXIDE_INSTALL_SCRIPT"
+    
+    # Clean up
+    rm "$ZOXIDE_INSTALL_SCRIPT"
+    
+    # Add zoxide to PATH in .zshrc if not already present
+    if ! grep -q 'eval "$(zoxide init zsh)"' "$CORRECT_HOME/.zshrc"; then
+        echo 'eval "$(zoxide init zsh)"' >> "$CORRECT_HOME/.zshrc"
+    fi
+    
+    echo "zoxide installed successfully."
+else
+    echo "zoxide is already installed."
 fi
 
 # Install Oh My Posh
