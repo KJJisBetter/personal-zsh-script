@@ -18,7 +18,7 @@ install_if_not_installed() {
     local package="$1"
     if ! command -v "$package" &> /dev/null; then
         echo "Installing $package..."
-        sudo apt update && sudo apt install -y "$package"
+        sudo apt update && sudo apt-get install -y "$package"
     else
         echo "$package is already installed."
     fi
@@ -39,7 +39,7 @@ fi
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
-    curl -s https://ohmyposh.dev/install.sh | sudo bash -s -- -d ~/.local/bin
+    sudo curl -s https://ohmyposh.dev/install.sh | sudo bash -s -- -d ~/.local/bin
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
