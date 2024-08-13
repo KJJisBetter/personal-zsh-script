@@ -21,6 +21,18 @@ CORRECT_HOME="/home/$CORRECT_USER"
 echo "Setting up environment for user: $CORRECT_USER"
 echo "Home directory: $CORRECT_HOME"
 
+# Determine the package manager
+if command -v apt &> /dev/null; then
+    PKG_MANAGER="apt"
+elif command -v dnf &> /dev/null; then
+    PKG_MANAGER="dnf"
+elif command -v yum &> /dev/null; then
+    PKG_MANAGER="yum"
+else
+    echo "Unsupported package manager. Please install packages manually."
+    PKG_MANAGER="echo"
+fi
+
 # Function to check and create a directory if it doesn't exist
 check_and_create_dir() {
     local dir_path="$1"
@@ -36,9 +48,20 @@ check_and_create_dir() {
 # Function to install a package if it's not already installed
 install_if_not_installed() {
     local package="$1"
-    if ! command -v "$package" &> /dev/null; then
+    local command_name="$2"
+    if ! command -v "$command_name" &> /dev/null; then
         echo "Installing $package..."
-        apt update && apt-get install -y "$package"
+        case "$PKG_MANAGER" in
+            apt)
+                sudo apt update && sudo apt install -y "$package"
+                ;;
+            dnf|yum)
+                sudo $PKG_MANAGER install -y "$package"
+                ;;
+            *)
+                echo "Please install $package manually."
+                ;;
+        esac
     else
         echo "$package is already installed."
     fi
@@ -75,86 +98,78 @@ else
     echo "Zen theme already exists at $ZEN_THEME_PATH"
 fi
 
-# Function to get the latest release URL for a given repo and file pattern
-install_from_github() {
-    local tool_name=$1
-    local repo=$2
-    local file_pattern=$3
-    local binary_name=$4
-
-    echo "Installing $tool_name..."
-    TEMP_DIR=$(mktemp -d)
-    DOWNLOAD_URL=$(get_latest_release_url "$repo" "$file_pattern")
-    
-    if [ -z "$DOWNLOAD_URL" ]; then
-        echo "Failed to get $tool_name download URL. Please install manually."
-        return 1
-    fi
-
-    echo "Downloading from: $DOWNLOAD_URL"
-    wget --verbose --tries=3 --timeout=15 "$DOWNLOAD_URL" -O "$TEMP_DIR/$tool_name.tar.gz"
-    if [ $? -ne 0 ]; then
-        echo "Failed to download $tool_name. Please check your internet connection and try again."
-        rm -rf "$TEMP_DIR"
-        return 1
-    fi
-
-    echo "Extracting $tool_name..."
-    tar xzvf "$TEMP_DIR/$tool_name.tar.gz" -C "$TEMP_DIR"
-    if [ $? -ne 0 ]; then
-        echo "Failed to extract $tool_name. The downloaded file may be corrupted."
-        rm -rf "$TEMP_DIR"
-        return 1
-    fi
-
-    echo "Moving $tool_name to /usr/local/bin/"
-    mv "$TEMP_DIR/$binary_name" "/usr/local/bin/$tool_name"
-    if [ $? -ne 0 ]; then
-        echo "Failed to move $tool_name to /usr/local/bin/. Please check permissions."
-        rm -rf "$TEMP_DIR"
-        return 1
-    fi
-
-    rm -rf "$TEMP_DIR"
-    echo "$tool_name installed successfully."
-}
-
-get_latest_release_url() {
-    local repo=$1
-    local file_pattern=$2
-    local api_url="https://api.github.com/repos/$repo/releases/latest"
-    
-    echo "Fetching latest release info from: $api_url"
-    local release_info=$(curl -s "$api_url")
-    if [ $? -ne 0 ]; then
-        echo "Failed to fetch release information from GitHub API."
-        return 1
-    fi
-
-    local download_url=$(echo "$release_info" | grep -oP '"browser_download_url": "\K(.*)(?=")' | grep "$file_pattern" | head -n 1)
-    if [ -z "$download_url" ]; then
-        echo "Failed to find a matching release asset."
-        return 1
-    fi
-
-    echo "$download_url"
-}
-
 # Install fd-find
-if ! command -v fd &> /dev/null; then
-    install_from_github "fd" "sharkdp/fd" "fd-v.*-x86_64-unknown-linux-gnu.tar.gz" "fd"
-fi
+case "$PKG_MANAGER" in
+    apt)
+        install_if_not_installed fd-find fd
+        ;;
+    dnf|yum)
+        install_if_not_installed fd-find fd
+        ;;
+    *)
+        echo "Please install fd-find manually."
+        ;;
+esac
 
 # Install bat
-if ! command -v bat &> /dev/null; then
-    install_from_github "bat" "sharkdp/bat" "bat-v.*-x86_64-unknown-linux-gnu.tar.gz" "bat"
+install_if_not_installed bat bat
+
+# Create symlinks if needed
+if command -v fdfind &> /dev/null && ! command -v fd &> /dev/null; then
+    sudo ln -s $(which fdfind) /usr/local/bin/fd
 fi
 
-# Install eza
-if ! command -v eza &> /dev/null; then
-    install_from_github "eza" "eza-community/eza" "eza_x86_64-unknown-linux-musl.tar.gz" "eza"
+if command -v batcat &> /dev/null && ! command -v bat &> /dev/null; then
+    sudo ln -s $(which batcat) /usr/local/bin/bat
 fi
 
+# Function to install gpg if not already installed
+install_gpg_if_needed() {
+    if ! command -v gpg &> /dev/null; then
+        echo "Installing gpg..."
+        apt update && apt install -y gpg
+    fi
+}
+
+# Function to install eza
+install_eza() {
+    if ! command -v eza &> /dev/null; then
+        echo "Installing eza for user $CORRECT_USER..."
+        
+        # Ensure gpg is installed
+        install_gpg_if_needed
+        
+        # Add the eza repository
+        mkdir -p /etc/apt/keyrings
+        wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" > /etc/apt/sources.list.d/gierens.list
+        
+        # Set correct permissions
+        chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
+        
+        # Update and install eza
+        apt update
+        apt install -y eza
+        
+        # Ensure the correct user can use eza
+        su - "$CORRECT_USER" -c "eza --version"
+        
+        # Add eza to the user's PATH if necessary
+        if ! su - "$CORRECT_USER" -c "command -v eza" &> /dev/null; then
+            echo 'export PATH="/usr/local/bin:$PATH"' >> "$CORRECT_HOME/.bashrc"
+            echo 'export PATH="/usr/local/bin:$PATH"' >> "$CORRECT_HOME/.zshrc"
+        fi
+    else
+        echo "eza is already installed."
+    fi
+}
+
+# Call the function to install eza
+install_eza
+
+# Ensure correct ownership of user directories
+chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local"
+chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.config"
 # Install fzf
 if ! command -v fzf &> /dev/null; then
     echo "Installing fzf..."
