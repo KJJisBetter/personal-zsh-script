@@ -59,6 +59,62 @@ install_if_not_installed() {
     fi
 }
 
+get_latest_release_url() {
+    local repo=$1
+    local file_pattern=$2
+    local os=$(uname -s | tr '[:upper:]' '[:lower:]')
+    local arch=$(uname -m)
+    local target=""
+
+    case "$os" in
+        linux)
+            case "$arch" in
+                x86_64) target="x86_64-unknown-linux-gnu" ;;
+                aarch64) target="aarch64-unknown-linux-gnu" ;;
+                *) echo "Unsupported Linux architecture: $arch"; return 1 ;;
+            esac
+            ;;
+        darwin)
+            case "$arch" in
+                x86_64) target="x86_64-apple-darwin" ;;
+                arm64) target="aarch64-apple-darwin" ;;
+                *) echo "Unsupported macOS architecture: $arch"; return 1 ;;
+            esac
+            ;;
+        *) echo "Unsupported operating system: $os"; return 1 ;;
+    esac
+
+    file_pattern=$(echo "$file_pattern" | sed "s/x86_64-unknown-linux-gnu/$target/g")
+
+    curl -s "https://api.github.com/repos/$repo/releases/latest" \
+    | grep "browser_download_url.*$file_pattern" \
+    | cut -d : -f 2,3 \
+    | tr -d \" \
+    | head -n 1
+}
+
+# Function to install a tool from GitHub release
+install_from_github() {
+    local tool_name=$1
+    local repo=$2
+    local file_pattern=$3
+    local binary_name=$4
+
+    echo "Installing $tool_name..."
+    TEMP_DIR=$(mktemp -d)
+    DOWNLOAD_URL=$(get_latest_release_url "$repo" "$file_pattern")
+    
+    if [ -z "$DOWNLOAD_URL" ]; then
+        echo "Failed to get $tool_name download URL. Please install manually."
+    else
+        wget -q "$DOWNLOAD_URL" -O "$TEMP_DIR/$tool_name.tar.gz"
+        tar xzf "$TEMP_DIR/$tool_name.tar.gz" -C "$TEMP_DIR"
+        sudo mv "$TEMP_DIR/$binary_name" "/usr/local/bin/$tool_name"
+        rm -rf "$TEMP_DIR"
+        echo "$tool_name installed successfully."
+    fi
+}
+
 # Install zsh if not already installed
 install_if_not_installed zsh
 
@@ -90,26 +146,69 @@ else
     echo "Zen theme already exists at $ZEN_THEME_PATH"
 fi
 
-# Install fd-find if not installed and create symlink
+# Install fd-find if not installed
 if ! command -v fd &> /dev/null; then
-    install_if_not_installed fd-find
-    run_as_user ln -sf $(which fdfind) "$CORRECT_HOME/.local/bin/fd"
+    install_from_github "fd" "sharkdp/fd" "fd-v.*-x86_64-unknown-linux-gnu.tar.gz" "fd"
 fi
 
-# Install bat and create symlink to batcat if not installed
-if ! command -v bat &> /dev/null && ! command -v batcat &> /dev/null; then
-    install_if_not_installed bat
-    run_as_user ln -sf $(which batcat) "$CORRECT_HOME/.local/bin/bat"
+# Install bat if not installed
+if ! command -v bat &> /dev/null; then
+    install_from_github "bat" "sharkdp/bat" "bat-v.*-x86_64-unknown-linux-gnu.tar.gz" "bat"
 fi
+
+# Ensure .local/bin exists in PATH
+run_as_user mkdir -p "$CORRECT_HOME/.local/bin"
+if [[ ":$PATH:" != *":$CORRECT_HOME/.local/bin:"* ]]; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$CORRECT_HOME/.bashrc"
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$CORRECT_HOME/.zshrc"
+fi
+
+# Function to get the latest eza release URL
+get_latest_eza_release() {
+    local os=$(uname -s | tr '[:upper:]' '[:lower:]')
+    local arch=$(uname -m)
+    local target=""
+
+    case "$os" in
+        linux)
+            case "$arch" in
+                x86_64) target="x86_64-unknown-linux-gnu" ;;
+                aarch64) target="aarch64-unknown-linux-gnu" ;;
+                *) echo "Unsupported Linux architecture: $arch"; return 1 ;;
+            esac
+            ;;
+        darwin)
+            case "$arch" in
+                x86_64) target="x86_64-apple-darwin" ;;
+                arm64) target="aarch64-apple-darwin" ;;
+                *) echo "Unsupported macOS architecture: $arch"; return 1 ;;
+            esac
+            ;;
+        *) echo "Unsupported operating system: $os"; return 1 ;;
+    esac
+
+    curl -s https://api.github.com/repos/eza-community/eza/releases/latest \
+    | grep "browser_download_url.*eza_$target.tar.gz" \
+    | cut -d : -f 2,3 \
+    | tr -d \" \
+    | head -n 1
+}
 
 # Install eza if not already installed
 if ! command -v eza &> /dev/null; then
     echo "Installing eza..."
-    sudo mkdir -p /etc/$PKG_MANAGER/keyrings
-    sudo wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/$PKG_MANAGER/keyrings/gierens.gpg
-    echo "deb [signed-by=/etc/$PKG_MANAGER/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/$PKG_MANAGER/sources.list.d/gierens.list
-    sudo $PKG_MANAGER update
-    sudo $PKG_MANAGER install -y eza
+    TEMP_DIR=$(mktemp -d)
+    EZA_URL=$(get_latest_eza_release)
+    
+    if [ -z "$EZA_URL" ]; then
+        echo "Failed to get eza download URL. Please install manually."
+    else
+        curl -sL "$EZA_URL" -o "$TEMP_DIR/eza.tar.gz"
+        tar xzf "$TEMP_DIR/eza.tar.gz" -C "$TEMP_DIR"
+        sudo mv "$TEMP_DIR/eza" /usr/local/bin/
+        rm -rf "$TEMP_DIR"
+        echo "eza installed successfully."
+    fi
 fi
 
 # Install fzf if not already installed
