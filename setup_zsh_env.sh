@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 # Function to check and create a directory if it doesn't exist
 check_and_create_dir() {
     local dir_path="$1"
@@ -13,12 +11,33 @@ check_and_create_dir() {
     fi
 }
 
+# Function to install a package if it's not already installed
+install_if_not_installed() {
+    local package="$1"
+    if ! command -v "$package" &> /dev/null; then
+        echo "Installing $package..."
+        sudo apt update && sudo apt install -y "$package"
+    else
+        echo "$package is already installed."
+    fi
+}
+
+# Install zsh if not already installed
+install_if_not_installed zsh
+
+# Install unzip if not already installed
+install_if_not_installed unzip
+
+# Install zoxide if not already installed
+if ! command -v zoxide &> /dev/null; then
+    echo "Installing zoxide..."
+    curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
+fi
+
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
-    mkdir -p ~/.local/bin
     curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
-    export PATH="$HOME/.local/bin:$PATH"
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
@@ -32,6 +51,28 @@ if [ ! -f "$ZEN_THEME_PATH" ]; then
     curl -o "$ZEN_THEME_PATH" "$ZEN_THEME_URL"
 else
     echo "Zen theme already exists at $ZEN_THEME_PATH"
+fi
+
+# Install fd-find if not installed and create symlink
+if ! command -v fd &> /dev/null; then
+    install_if_not_installed fd-find
+    ln -sf $(which fdfind) ~/.local/bin/fd
+fi
+
+# Install bat and create symlink to batcat if not installed
+if ! command -v bat &> /dev/null && ! command -v batcat &> /dev/null; then
+    install_if_not_installed bat
+    ln -sf $(which batcat) ~/.local/bin/bat
+fi
+
+# Install eza if not already installed
+if ! command -v eza &> /dev/null; then
+    echo "Installing eza..."
+    sudo mkdir -p /etc/apt/keyrings
+    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
+    sudo apt update
+    sudo apt install -y eza
 fi
 
 # Install fzf if not already installed
@@ -76,6 +117,7 @@ zinit snippet OMZP::aws
 zinit snippet OMZP::kubectl
 zinit snippet OMZP::kubectx
 zinit snippet OMZP::command-not-found
+
 
 # Load completions
 autoload -Uz compinit && compinit
@@ -149,4 +191,4 @@ eval "$(oh-my-posh init zsh --config ~/.config/oh-my-posh/themes/zen.toml)"
 
 EOF
 
-echo "Zsh configuration completed. Please restart your shell or run 'source ~/.zshrc'."
+echo "Setup completed. Please restart your terminal or source your .zshrc file."
