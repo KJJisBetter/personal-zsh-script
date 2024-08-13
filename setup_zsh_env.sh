@@ -54,7 +54,7 @@ install_if_not_installed() {
     if ! command -v "$command_name" &> /dev/null; then
         echo "Installing $package..."
         case "$PKG_MANAGER" in
-            apt)
+            apt-get)
                 sudo $PKG_MANAGER update && sudo $PKG_MANAGER install -y "$package"
                 ;;
             dnf|yum)
@@ -104,10 +104,10 @@ fi
 # Install fd-find
 case "$PKG_MANAGER" in
     apt-get)
-        install_if_not_installed fd-find fd
+        install_if_not_installed fd-find
         ;;
     dnf|yum)
-        install_if_not_installed fd-find fd
+        install_if_not_installed fd-find
         ;;
     *)
         echo "Please install fd-find manually."
@@ -115,7 +115,7 @@ case "$PKG_MANAGER" in
 esac
 
 # Install bat
-install_if_not_installed bat bat
+install_if_not_installed bat
 
 # Create symlinks if needed
 if command -v fdfind &> /dev/null && ! command -v fd &> /dev/null; then
@@ -125,106 +125,6 @@ fi
 if command -v batcat &> /dev/null && ! command -v bat &> /dev/null; then
     sudo ln -s $(which batcat) /usr/local/bin/bat
 fi
-
-# Function to install gpg if not already installed
-install_gpg_if_needed() {
-    if ! command -v gpg &> /dev/null; then
-        echo "Installing gpg..."
-        apt update && apt install -y gpg
-    fi
-}
-
-# Function to install eza
-install_eza() {
-    if ! command -v eza &> /dev/null; then
-        echo "Installing eza for user $CORRECT_USER..."
-
-        # Detect OS and architecture
-        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-        ARCH=$(uname -m)
-
-        # Set the correct URL based on OS and architecture
-        case "$OS" in
-            linux)
-                case "$ARCH" in
-                    x86_64)
-                        URL="https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz"
-                        ;;
-                    aarch64)
-                        URL="https://github.com/eza-community/eza/releases/latest/download/eza_aarch64-unknown-linux-gnu.tar.gz"
-                        ;;
-                    *)
-                        echo "Unsupported Linux architecture: $ARCH"
-                        return 1
-                        ;;
-                esac
-                ;;
-            darwin)
-                case "$ARCH" in
-                    x86_64)
-                        URL="https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-apple-darwin.tar.gz"
-                        ;;
-                    arm64)
-                        URL="https://github.com/eza-community/eza/releases/latest/download/eza_aarch64-apple-darwin.tar.gz"
-                        ;;
-                    *)
-                        echo "Unsupported macOS architecture: $ARCH"
-                        return 1
-                        ;;
-                esac
-                ;;
-            *)
-                echo "Unsupported operating system: $OS"
-                return 1
-                ;;
-        esac
-
-        # Create a temporary directory
-        TEMP_DIR=$(mktemp -d)
-        
-        # Download and extract eza
-        wget -c "$URL" -O - | tar xz -C "$TEMP_DIR"
-        
-        # Make eza executable
-        chmod +x "$TEMP_DIR/eza"
-        
-        # Move eza to /usr/local/bin
-        mv "$TEMP_DIR/eza" /usr/local/bin/eza
-        
-        # Clean up
-        rm -rf "$TEMP_DIR"
-        
-        # Check if installation was successful
-        if command -v eza &> /dev/null; then
-            echo "eza installed successfully."
-        else
-            echo "Failed to install eza."
-            return 1
-        fi
-    else
-        echo "eza is already installed."
-    fi
-
-    # Ensure the correct user can use eza
-    su - "$CORRECT_USER" -c "eza --version"
-    
-    # Add eza to the user's PATH if necessary
-    if ! su - "$CORRECT_USER" -c "command -v eza" &> /dev/null; then
-        echo 'export PATH="/usr/local/bin:$PATH"' >> "$CORRECT_HOME/.bashrc"
-        echo 'export PATH="/usr/local/bin:$PATH"' >> "$CORRECT_HOME/.zshrc"
-    fi
-
-    # Handle potential exa installation
-    if command -v exa &> /dev/null; then
-        echo "Removing old exa installation..."
-        rm -f /usr/local/bin/exa
-        ln -s /usr/local/bin/eza /usr/local/bin/exa
-        echo "Created symlink from eza to exa for compatibility."
-    fi
-}
-
-# Call the function to install eza
-install_eza
 
 # Ensure correct ownership of user directories
 chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local"
@@ -252,6 +152,49 @@ if [ ! -d "$FZF_GIT_DIR" ]; then
     git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR"
     chown -R "$CORRECT_USER:$CORRECT_USER" "$FZF_GIT_DIR"
 fi
+
+install_eza() {
+    if ! command -v eza &> /dev/null; then
+        echo "Installing eza..."
+        
+        # Determine system architecture
+        ARCH=$(uname -m)
+        case "$ARCH" in
+            x86_64)
+                EZA_ARCH="x86_64-unknown-linux-gnu"
+                ;;
+            aarch64)
+                EZA_ARCH="aarch64-unknown-linux-gnu"
+                ;;
+            *)
+                echo "Unsupported architecture: $ARCH"
+                return 1
+                ;;
+        esac
+
+        # Download and install eza
+        TEMP_DIR=$(mktemp -d)
+        wget -c "https://github.com/eza-community/eza/releases/latest/download/eza_${EZA_ARCH}.tar.gz" -O - | tar xz -C "$TEMP_DIR"
+        chmod +x "$TEMP_DIR/eza"
+        chown root:root "$TEMP_DIR/eza"
+        mv "$TEMP_DIR/eza" /usr/local/bin/eza
+        rm -rf "$TEMP_DIR"
+
+        # Create symlink for exa compatibility
+        if command -v exa &> /dev/null; then
+            echo "Replacing exa with eza..."
+            rm -f /usr/local/bin/exa
+            ln -s /usr/local/bin/eza /usr/local/bin/exa
+        fi
+
+        echo "eza installed successfully."
+    else
+        echo "eza is already installed."
+    fi
+}
+
+# Call the function to install eza
+install_eza
 
 # Ensure .zshrc exists and has correct permissions
 ZSHRC="$CORRECT_HOME/.zshrc"
