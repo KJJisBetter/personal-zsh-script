@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -e
 
 # Ensure the script is run with sudo
 if [ "$EUID" -ne 0 ]; then
