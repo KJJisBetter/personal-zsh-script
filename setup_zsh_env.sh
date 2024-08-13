@@ -39,7 +39,7 @@ fi
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
-    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d $HOME/.local/bin
+    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d "$HOME/.local/bin"
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
@@ -58,13 +58,13 @@ fi
 # Install fd-find if not installed and create symlink
 if ! command -v fd &> /dev/null; then
     install_if_not_installed fd-find
-    ln -sf $(which fdfind) $HOME/.local/bin/fd
+    ln -sf $(which fdfind) "$HOME/.local/bin/fd"
 fi
 
 # Install bat and create symlink to batcat if not installed
 if ! command -v bat &> /dev/null && ! command -v batcat &> /dev/null; then
     install_if_not_installed bat
-    ln -sf $(which batcat) $HOME/.local/bin/bat
+    ln -sf $(which batcat) "$HOME/.local/bin/bat"
 fi
 
 # Install eza if not already installed
@@ -80,14 +80,14 @@ fi
 # Install fzf if not already installed
 if ! command -v fzf &> /dev/null; then
     echo "Installing fzf..."
-    git clone --depth 1 https://github.com/junegunn/fzf.git $HOME/.fzf
-    $HOME/.fzf/install --all
+    git clone --depth 1 https://github.com/junegunn/fzf.git "$HOME/.fzf"
+    "$HOME/.fzf/install" --all
 fi
 
 # Install Zinit if not already installed
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 if [ ! -d "$ZINIT_HOME" ]; then
-    mkdir -p "$(dirname $ZINIT_HOME)"
+    mkdir -p "$(dirname "$ZINIT_HOME")"
     git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
 fi
 
@@ -97,8 +97,21 @@ if [ ! -d "$FZF_GIT_DIR" ]; then
     git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR"
 fi
 
-# Add configurations to .zshrc
-cat << 'EOF' > $HOME/.zshrc
+# Function to safely append configurations to .zshrc
+append_to_zshrc() {
+    local content="$1"
+    local zshrc="$HOME/.zshrc"
+
+    if [ -f "$zshrc" ]; then
+        echo "$content" >> "$zshrc"
+    else
+        echo "$content" > "$zshrc"
+    fi
+}
+
+# Content to add to .zshrc
+zshrc_content=$(cat << 'EOF'
+
 # Set the directory we want to store zinit and plugins
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
@@ -119,7 +132,6 @@ zinit snippet OMZP::aws
 zinit snippet OMZP::kubectl
 zinit snippet OMZP::kubectx
 zinit snippet OMZP::command-not-found
-
 
 # Load completions
 autoload -Uz compinit && compinit
@@ -192,5 +204,9 @@ eval "$(zoxide init zsh)"
 eval "$(oh-my-posh init zsh --config $HOME/.config/oh-my-posh/themes/zen.toml)"
 
 EOF
+)
 
-echo "Setup completed. Please restart your terminal or source your .zshrc file."
+# Append the content to .zshrc
+append_to_zshrc "$zshrc_content"
+
+echo "Zsh configuration completed. Please restart your terminal or source your .zshrc file."
