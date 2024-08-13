@@ -1,5 +1,7 @@
 #!/bin/bash
 
+setup -e
+
 # Function to check and create a directory if it doesn't exist
 check_and_create_dir() {
     local dir_path="$1"
@@ -37,6 +39,7 @@ fi
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
+    check_and_create_dir ~/.local/bin
     curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
 fi
 
