@@ -2,26 +2,11 @@
 
 set -e
 
-# Check if script is run with sudo
-if [ "$EUID" -ne 0 ]; then
-  echo "Please run this script with sudo"
-  exit 1
-fi
-
-# Get the actual user's username and home directory
-ACTUAL_USER=$(logname)
-ACTUAL_HOME=$(eval echo ~$ACTUAL_USER)
-
-# Function to run a command as the actual user
-run_as_user() {
-    sudo -u "$ACTUAL_USER" "$@"
-}
-
 # Function to check and create a directory if it doesn't exist
 check_and_create_dir() {
     local dir_path="$1"
     if [ ! -d "$dir_path" ]; then
-        run_as_user mkdir -p "$dir_path"
+        mkdir -p "$dir_path"
         echo "Created directory at $dir_path"
     else
         echo "Directory $dir_path already exists."
@@ -33,14 +18,11 @@ install_if_not_installed() {
     local package="$1"
     if ! command -v "$package" &> /dev/null; then
         echo "Installing $package..."
-        DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$package"
+        sudo apt update && sudo apt install -y "$package"
     else
         echo "$package is already installed."
     fi
 }
-
-# Ensure ~/.local/bin exists
-check_and_create_dir "$ACTUAL_HOME/.local/bin"
 
 # Install zsh if not already installed
 install_if_not_installed zsh
@@ -51,24 +33,24 @@ install_if_not_installed unzip
 # Install zoxide if not already installed
 if ! command -v zoxide &> /dev/null; then
     echo "Installing zoxide..."
-    run_as_user curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | run_as_user bash
+    curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
 fi
 
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
-    run_as_user curl -s https://ohmyposh.dev/install.sh | run_as_user bash -s -- -d "$ACTUAL_HOME/.local/bin"
+    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
-THEMES_DIR="$ACTUAL_HOME/.config/oh-my-posh/themes"
+THEMES_DIR="$HOME/.config/oh-my-posh/themes"
 check_and_create_dir "$THEMES_DIR"
 
 ZEN_THEME_URL="https://raw.githubusercontent.com/dreamsofautonomy/zen-omp/main/zen.toml"
 ZEN_THEME_PATH="$THEMES_DIR/zen.toml"
 if [ ! -f "$ZEN_THEME_PATH" ]; then
     echo "Downloading Zen theme for Oh My Posh..."
-    run_as_user curl -o "$ZEN_THEME_PATH" "$ZEN_THEME_URL"
+    curl -o "$ZEN_THEME_PATH" "$ZEN_THEME_URL"
 else
     echo "Zen theme already exists at $ZEN_THEME_PATH"
 fi
@@ -76,49 +58,47 @@ fi
 # Install fd-find if not installed and create symlink
 if ! command -v fd &> /dev/null; then
     install_if_not_installed fd-find
-    ln -sf $(which fdfind) "$ACTUAL_HOME/.local/bin/fd"
-    chown $ACTUAL_USER:$ACTUAL_USER "$ACTUAL_HOME/.local/bin/fd"
+    ln -sf $(which fdfind) ~/.local/bin/fd
 fi
 
 # Install bat and create symlink to batcat if not installed
 if ! command -v bat &> /dev/null && ! command -v batcat &> /dev/null; then
     install_if_not_installed bat
-    ln -sf $(which batcat) "$ACTUAL_HOME/.local/bin/bat"
-    chown $ACTUAL_USER:$ACTUAL_USER "$ACTUAL_HOME/.local/bin/bat"
+    ln -sf $(which batcat) ~/.local/bin/bat
 fi
 
 # Install eza if not already installed
 if ! command -v eza &> /dev/null; then
     echo "Installing eza..."
-    mkdir -p /etc/apt/keyrings
-    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
-    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | tee /etc/apt/sources.list.d/gierens.list
-    DEBIAN_FRONTEND=noninteractive apt-get update
-    DEBIAN_FRONTEND=noninteractive apt-get install -y eza
+    sudo mkdir -p /etc/apt/keyrings
+    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
+    sudo apt update
+    sudo apt install -y eza
 fi
 
 # Install fzf if not already installed
 if ! command -v fzf &> /dev/null; then
     echo "Installing fzf..."
-    run_as_user git clone --depth 1 https://github.com/junegunn/fzf.git "$ACTUAL_HOME/.fzf"
-    run_as_user "$ACTUAL_HOME/.fzf/install" --all --no-bash --no-fish
+    git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
+    ~/.fzf/install --all
 fi
 
 # Install Zinit if not already installed
-ZINIT_HOME="${XDG_DATA_HOME:-$ACTUAL_HOME/.local/share}/zinit/zinit.git"
+ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 if [ ! -d "$ZINIT_HOME" ]; then
-    run_as_user mkdir -p "$(dirname $ZINIT_HOME)"
-    run_as_user git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
+    mkdir -p "$(dirname $ZINIT_HOME)"
+    git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
 fi
 
 # Clone fzf-git script
-FZF_GIT_DIR="$ACTUAL_HOME/.fzf-git"
+FZF_GIT_DIR="$HOME/.fzf-git"
 if [ ! -d "$FZF_GIT_DIR" ]; then
-    run_as_user git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR"
+    git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR"
 fi
 
 # Add configurations to .zshrc
-run_as_user cat << 'EOF' > "$ACTUAL_HOME/.zshrc"
+cat << 'EOF' > ~/.zshrc
 # Set the directory we want to store zinit and plugins
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
@@ -139,6 +119,7 @@ zinit snippet OMZP::aws
 zinit snippet OMZP::kubectl
 zinit snippet OMZP::kubectx
 zinit snippet OMZP::command-not-found
+
 
 # Load completions
 autoload -Uz compinit && compinit
