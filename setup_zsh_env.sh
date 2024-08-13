@@ -76,7 +76,7 @@ install_if_not_installed unzip
 # Install zoxide
 if ! command -v zoxide &> /dev/null; then
     echo "Installing zoxide..."
-    curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
+    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
 fi
 
 # Install Oh My Posh
