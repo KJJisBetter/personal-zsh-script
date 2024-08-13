@@ -97,20 +97,19 @@ if [ ! -d "$FZF_GIT_DIR" ]; then
     git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR"
 fi
 
+# Ensure .zshrc exists and has correct permissions
+ZSHRC="$HOME/.zshrc"
+touch "$ZSHRC"
+chmod 644 "$ZSHRC"
+
 # Function to safely append configurations to .zshrc
 append_to_zshrc() {
     local content="$1"
-    local zshrc="$HOME/.zshrc"
-
-    if [ -f "$zshrc" ]; then
-        echo "$content" >> "$zshrc"
-    else
-        echo "$content" > "$zshrc"
-    fi
+    echo "$content" >> "$ZSHRC"
 }
 
 # Content to add to .zshrc
-zshrc_content=$(cat << 'EOF'
+append_to_zshrc=$(cat << 'EOF'
 
 # Set the directory we want to store zinit and plugins
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
@@ -214,5 +213,8 @@ sudo chown -R $(whoami):$(whoami) "$HOME/.fzf-git"
 
 # Append the content to .zshrc
 append_to_zshrc "$zshrc_content"
+
+# Ensure correct ownership of .zshrc
+chown $(whoami):$(whoami) "$ZSHRC"
 
 echo "Zsh configuration completed. Please restart your terminal or source your .zshrc file."
