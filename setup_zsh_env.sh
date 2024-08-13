@@ -143,6 +143,7 @@ fi
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
+    check_and_create_dir $CORRECT_HOME/.local/bin
     run_as_user curl -s https://ohmyposh.dev/install.sh | run_as_user bash -s -- -d "$CORRECT_HOME/.local/bin"
 fi
 
