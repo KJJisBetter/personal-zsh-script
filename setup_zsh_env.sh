@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 # Function to check and create a directory if it doesn't exist
 check_and_create_dir() {
@@ -205,6 +205,12 @@ eval "$(oh-my-posh init zsh --config $HOME/.config/oh-my-posh/themes/zen.toml)"
 
 EOF
 )
+
+# Ensure correct ownership of user directories
+sudo chown -R $(whoami):$(whoami) "$HOME/.local"
+sudo chown -R $(whoami):$(whoami) "$HOME/.config"
+sudo chown -R $(whoami):$(whoami) "$HOME/.fzf"
+sudo chown -R $(whoami):$(whoami) "$HOME/.fzf-git"
 
 # Append the content to .zshrc
 append_to_zshrc "$zshrc_content"
