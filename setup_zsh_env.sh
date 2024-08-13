@@ -85,15 +85,10 @@ if ! command -v zoxide &> /dev/null; then
     sed -i 's|PREFIX=.*|PREFIX="$HOME/.local"|' "$ZOXIDE_INSTALL_SCRIPT"
     
     # Run the install script as the correct user
-    -u "$CORRECT_USER" bash -c "HOME=$CORRECT_HOME $ZOXIDE_INSTALL_SCRIPT"
+    sh -c "HOME=$CORRECT_HOME $ZOXIDE_INSTALL_SCRIPT"
     
     # Clean up
     rm "$ZOXIDE_INSTALL_SCRIPT"
-    
-    # Add zoxide to PATH in .zshrc if not already present
-    if ! grep -q 'eval "$(zoxide init zsh)"' "$CORRECT_HOME/.zshrc"; then
-        echo 'eval "$(zoxide init zsh)"' >> "$CORRECT_HOME/.zshrc"
-    fi
     
     echo "zoxide installed successfully."
 else
