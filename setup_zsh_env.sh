@@ -85,7 +85,7 @@ if ! command -v zoxide &> /dev/null; then
     sed -i 's|PREFIX=.*|PREFIX="$HOME/.local"|' "$ZOXIDE_INSTALL_SCRIPT"
     
     # Run the install script as the correct user
-    sudo -u "$CORRECT_USER" bash -c "HOME=$CORRECT_HOME $ZOXIDE_INSTALL_SCRIPT"
+    -u "$CORRECT_USER" bash -c "HOME=$CORRECT_HOME $ZOXIDE_INSTALL_SCRIPT"
     
     # Clean up
     rm "$ZOXIDE_INSTALL_SCRIPT"
