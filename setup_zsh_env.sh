@@ -48,12 +48,25 @@ check_and_create_dir() {
     fi
 }
 
-# Function to install a package if it's not already installed
 install_if_not_installed() {
     local package="$1"
     if ! command -v "$package" &> /dev/null; then
         echo "Installing $package..."
-        sudo $PKG_MANAGER update && sudo $PKG_MANAGER install -y "$package"
+        case "$PKG_MANAGER" in
+            apt-get|apt)
+                sudo $PKG_MANAGER update && sudo $PKG_MANAGER install -y "$package"
+                ;;
+            yum|dnf)
+                sudo $PKG_MANAGER install -y "$package"
+                ;;
+            brew)
+                brew install "$package"
+                ;;
+            *)
+                echo "Unsupported package manager. Please install $package manually."
+                return 1
+                ;;
+        esac
     else
         echo "$package is already installed."
     fi
