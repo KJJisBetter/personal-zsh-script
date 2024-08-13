@@ -39,8 +39,8 @@ fi
 # Install Oh My Posh if not already installed
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
-    mkdir ~/.oh-my-posh/bin
-    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.oh-my-posh/bin
+    sudo mkdir ~/.local/bin
+    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
