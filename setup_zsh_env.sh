@@ -1,6 +1,6 @@
 #!/bin/bash
 
-setup -e
+set -e
 
 # Function to check and create a directory if it doesn't exist
 check_and_create_dir() {
