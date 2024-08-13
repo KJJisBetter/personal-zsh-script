@@ -2,6 +2,18 @@
 
 set -ex
 
+# At the beginning of the script
+if command -v apt-get &> /dev/null; then
+    PKG_MANAGER="apt-get"
+elif command -v yum &> /dev/null; then
+    PKG_MANAGER="yum"
+elif command -v brew &> /dev/null; then
+    PKG_MANAGER="brew"
+else
+    echo "Unsupported package manager. Please install packages manually."
+    PKG_MANAGER="echo"
+fi
+
 # Determine the correct user and home directory
 if [ -n "$CODER_USER_NAME" ]; then
     CORRECT_USER="$CODER_USER_NAME"
@@ -41,7 +53,7 @@ install_if_not_installed() {
     local package="$1"
     if ! command -v "$package" &> /dev/null; then
         echo "Installing $package..."
-        sudo apt update && sudo apt-get install -y "$package"
+        sudo $PKG_MANAGER update && sudo $PKG_MANAGER install -y "$package"
     else
         echo "$package is already installed."
     fi
@@ -93,11 +105,11 @@ fi
 # Install eza if not already installed
 if ! command -v eza &> /dev/null; then
     echo "Installing eza..."
-    sudo mkdir -p /etc/apt/keyrings
-    sudo wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
-    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
-    sudo apt update
-    sudo apt install -y eza
+    sudo mkdir -p /etc/$PKG_MANAGER/keyrings
+    sudo wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/$PKG_MANAGER/keyrings/gierens.gpg
+    echo "deb [signed-by=/etc/$PKG_MANAGER/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/$PKG_MANAGER/sources.list.d/gierens.list
+    sudo $PKG_MANAGER update
+    sudo $PKG_MANAGER install -y eza
 fi
 
 # Install fzf if not already installed
