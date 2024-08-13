@@ -76,17 +76,6 @@ else
 fi
 
 # Function to get the latest release URL for a given repo and file pattern
-get_latest_release_url() {
-    local repo=$1
-    local file_pattern=$2
-    curl -s "https://api.github.com/repos/$repo/releases/latest" \
-    | grep "browser_download_url.*$file_pattern" \
-    | cut -d : -f 2,3 \
-    | tr -d \" \
-    | head -n 1
-}
-
-# Function to install a tool from GitHub release
 install_from_github() {
     local tool_name=$1
     local repo=$2
@@ -99,13 +88,56 @@ install_from_github() {
     
     if [ -z "$DOWNLOAD_URL" ]; then
         echo "Failed to get $tool_name download URL. Please install manually."
-    else
-        wget -q "$DOWNLOAD_URL" -O "$TEMP_DIR/$tool_name.tar.gz"
-        tar xzf "$TEMP_DIR/$tool_name.tar.gz" -C "$TEMP_DIR"
-        mv "$TEMP_DIR/$binary_name" "/usr/local/bin/$tool_name"
-        rm -rf "$TEMP_DIR"
-        echo "$tool_name installed successfully."
+        return 1
     fi
+
+    echo "Downloading from: $DOWNLOAD_URL"
+    wget --verbose --tries=3 --timeout=15 "$DOWNLOAD_URL" -O "$TEMP_DIR/$tool_name.tar.gz"
+    if [ $? -ne 0 ]; then
+        echo "Failed to download $tool_name. Please check your internet connection and try again."
+        rm -rf "$TEMP_DIR"
+        return 1
+    fi
+
+    echo "Extracting $tool_name..."
+    tar xzvf "$TEMP_DIR/$tool_name.tar.gz" -C "$TEMP_DIR"
+    if [ $? -ne 0 ]; then
+        echo "Failed to extract $tool_name. The downloaded file may be corrupted."
+        rm -rf "$TEMP_DIR"
+        return 1
+    fi
+
+    echo "Moving $tool_name to /usr/local/bin/"
+    mv "$TEMP_DIR/$binary_name" "/usr/local/bin/$tool_name"
+    if [ $? -ne 0 ]; then
+        echo "Failed to move $tool_name to /usr/local/bin/. Please check permissions."
+        rm -rf "$TEMP_DIR"
+        return 1
+    fi
+
+    rm -rf "$TEMP_DIR"
+    echo "$tool_name installed successfully."
+}
+
+get_latest_release_url() {
+    local repo=$1
+    local file_pattern=$2
+    local api_url="https://api.github.com/repos/$repo/releases/latest"
+    
+    echo "Fetching latest release info from: $api_url"
+    local release_info=$(curl -s "$api_url")
+    if [ $? -ne 0 ]; then
+        echo "Failed to fetch release information from GitHub API."
+        return 1
+    fi
+
+    local download_url=$(echo "$release_info" | grep -oP '"browser_download_url": "\K(.*)(?=")' | grep "$file_pattern" | head -n 1)
+    if [ -z "$download_url" ]; then
+        echo "Failed to find a matching release asset."
+        return 1
+    fi
+
+    echo "$download_url"
 }
 
 # Install fd-find
