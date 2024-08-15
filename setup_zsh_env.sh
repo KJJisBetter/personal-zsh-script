@@ -71,8 +71,8 @@ install_if_not_installed() {
 }
 
 # Install zsh and unzip
-install_if_not_installed zsh zsh || echo "Failed to install zsh, but continuing..."
-install_if_not_installed unzip unzip || echo "Failed to install unzip, but continuing..."
+install_if_not_installed zsh || echo "Failed to install zsh, but continuing..."
+install_if_not_installed unzip || echo "Failed to install unzip, but continuing..."
 
 # Install zoxide
 if ! command -v zoxide &> /dev/null; then
@@ -125,10 +125,10 @@ fi
 # Install fd-find
 case "$PKG_MANAGER" in
     apt-get)
-        install_if_not_installed fd-find fdfind || echo "Failed to install fd-find, but continuing..."
+        install_if_not_installed fd-find || echo "Failed to install fd-find, but continuing..."
         ;;
     dnf|yum)
-        install_if_not_installed fd-find fd || echo "Failed to install fd-find, but continuing..."
+        install_if_not_installed fd-find || echo "Failed to install fd-find, but continuing..."
         ;;
     *)
         echo "Please install fd-find manually."
@@ -136,11 +136,11 @@ case "$PKG_MANAGER" in
 esac
 
 # Install bat
-install_if_not_installed bat bat || echo "Failed to install bat, but continuing..."
+install_if_not_installed bat || echo "Failed to install bat, but continuing..."
 
 # Create symlinks if needed
 if command -v fdfind &> /dev/null && ! command -v fd &> /dev/null; then
-    sudo ln -s $(which fdfind) /usr/local/bin/fd || echo "Failed to create symlink for fd, but continuing..."
+    sudo ln -s $(which fd-find) /usr/local/bin/fd || echo "Failed to create symlink for fd, but continuing..."
 fi
 
 if command -v batcat &> /dev/null && ! command -v bat &> /dev/null; then
