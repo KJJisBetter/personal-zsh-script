@@ -246,109 +246,110 @@ append_to_zshrc() {
 
 # Add your zshrc content here
 zshrc_content=$(cat << 'EOF'
-    # Path to the flag file
-    FLAG_FILE="$HOME/.zsh_first_run_complete"
-    
-    # Check if the flag file exists
-    if [ ! -f "$FLAG_FILE" ]; then
-        # Display the message
-        echo "Welcome! This message will only appear once. Some dependencies might be installed during the first run."
-    
-        # Create the flag file to prevent this message from showing again
-        touch "$FLAG_FILE"
-    fi
-    
-    # Set the directory we want to store zinit and plugins
-    ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
-    
-    # Source/Load zinit
-    source "${ZINIT_HOME}/zinit.zsh"
-    
-    # Add in zsh plugins
-    zinit light zsh-users/zsh-syntax-highlighting
-    zinit light zsh-users/zsh-completions
-    zinit light zsh-users/zsh-autosuggestions
-    zinit light Aloxaf/fzf-tab
-    
-    # Add in snippets
-    zinit snippet OMZP::git
-    zinit snippet OMZP::sudo
-    zinit snippet OMZP::archlinux
-    zinit snippet OMZP::aws
-    zinit snippet OMZP::kubectl
-    zinit snippet OMZP::kubectx
-    zinit snippet OMZP::command-not-found
-    
-    # Load completions
-    autoload -Uz compinit && compinit
-    
-    zinit cdreplay -q
-    
-    # Keybindings
-    bindkey -e
-    bindkey '^p' history-search-backward
-    bindkey '^n' history-search-forward
-    
-    # History
-    HISTSIZE=5000
-    HISTFILE=$HOME/.zsh_history
-    SAVEHIST=$HISTSIZE
-    HISTDUP=erase
-    setopt appendhistory
-    setopt sharehistory
-    setopt hist_ignore_space
-    setopt hist_ignore_all_dups
-    setopt hist_save_no_dups
-    setopt hist_ignore_dups
-    setopt hist_find_no_dups
-    
-    # Completion styling
-    zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
-    zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
-    zstyle ':completion:*' menu no
-    zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza --tree --color=always {} | head -200'
-    zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --tree --color=always {} | head -200'
-    
-    # Aliases
-    alias ls="eza --color=always --long --git --no-filesize --icons=always --no-time --no-user --no-permissions"
-    
-    # PATHS
-    export PATH="$HOME/.local/bin:$PATH"
-    export PATH="$HOME/.fzf/bin:$PATH"
-    export PATH="/usr/local/bin:$PATH"
-    export PATH="/usr/bin:$PATH"
-    export PATH="/bin:$PATH"
-    export PATH="/.local/bin:$PATH"
-    
-    # FZF configuration
-    [ -f $HOME/.fzf.zsh ] && source $HOME/.fzf.zsh
-    
-    export FZF_DEFAULT_COMMAND="fd --type f --hidden --follow --exclude .git"
-    export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
-    export FZF_ALT_C_COMMAND="fd --type d --hidden --follow --exclude .git"
-    
-    # FZF options
-    export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border"
-    export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :500 {}'"
-    export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
-    
-    # Use fd for fzf completion
-    _fzf_compgen_path() {
-      fd --hidden --follow --exclude ".git" . "$1"
-    }
-    
-    _fzf_compgen_dir() {
-      fd --type d --hidden --follow --exclude ".git" . "$1"
-    }
-    
-    # Source fzf-git script
-    source $HOME/.fzf-git/fzf-git.sh
-    
-    # Shell integration
-    eval "$(zoxide init zsh)"
-    
-    # oh my posh customization for zsh
-    eval "$(oh-my-posh init zsh --config $HOME/.config/oh-my-posh/themes/zen.toml)"
+
+# Path to the flag file
+FLAG_FILE="$HOME/.zsh_first_run_complete"
+
+# Check if the flag file exists
+if [ ! -f "$FLAG_FILE" ]; then
+    # Display the message
+    echo "Welcome! This message will only appear once. Some dependencies might be installed during the first run."
+
+    # Create the flag file to prevent this message from showing again
+    touch "$FLAG_FILE"
+fi
+
+# Set the directory we want to store zinit and plugins
+ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
+
+# Source/Load zinit
+source "${ZINIT_HOME}/zinit.zsh"
+
+# Add in zsh plugins
+zinit light zsh-users/zsh-syntax-highlighting
+zinit light zsh-users/zsh-completions
+zinit light zsh-users/zsh-autosuggestions
+zinit light Aloxaf/fzf-tab
+
+# Add in snippets
+zinit snippet OMZP::git
+zinit snippet OMZP::sudo
+zinit snippet OMZP::archlinux
+zinit snippet OMZP::aws
+zinit snippet OMZP::kubectl
+zinit snippet OMZP::kubectx
+zinit snippet OMZP::command-not-found
+
+# Load completions
+autoload -Uz compinit && compinit
+
+zinit cdreplay -q
+
+# Keybindings
+bindkey -e
+bindkey '^p' history-search-backward
+bindkey '^n' history-search-forward
+
+# History
+HISTSIZE=5000
+HISTFILE=$HOME/.zsh_history
+SAVEHIST=$HISTSIZE
+HISTDUP=erase
+setopt appendhistory
+setopt sharehistory
+setopt hist_ignore_space
+setopt hist_ignore_all_dups
+setopt hist_save_no_dups
+setopt hist_ignore_dups
+setopt hist_find_no_dups
+
+# Completion styling
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+zstyle ':completion:*' menu no
+zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza --tree --color=always {} | head -200'
+zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --tree --color=always {} | head -200'
+
+# Aliases
+alias ls="eza --color=always --long --git --no-filesize --icons=always --no-time --no-user --no-permissions"
+
+# PATHS
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.fzf/bin:$PATH"
+export PATH="/usr/local/bin:$PATH"
+export PATH="/usr/bin:$PATH"
+export PATH="/bin:$PATH"
+export PATH="/.local/bin:$PATH"
+
+# FZF configuration
+[ -f $HOME/.fzf.zsh ] && source $HOME/.fzf.zsh
+
+export FZF_DEFAULT_COMMAND="fd --type f --hidden --follow --exclude .git"
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+export FZF_ALT_C_COMMAND="fd --type d --hidden --follow --exclude .git"
+
+# FZF options
+export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border"
+export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :500 {}'"
+export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
+
+# Use fd for fzf completion
+_fzf_compgen_path() {
+  fd --hidden --follow --exclude ".git" . "$1"
+}
+
+_fzf_compgen_dir() {
+  fd --type d --hidden --follow --exclude ".git" . "$1"
+}
+
+# Source fzf-git script
+source $HOME/.fzf-git/fzf-git.sh
+
+# Shell integration
+eval "$(zoxide init zsh)"
+
+# oh my posh customization for zsh
+eval "$(oh-my-posh init zsh --config $HOME/.config/oh-my-posh/themes/zen.toml)"
 EOF
 )
 
