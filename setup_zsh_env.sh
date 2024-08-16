@@ -140,7 +140,7 @@ install_if_not_installed bat || echo "Failed to install bat, but continuing..."
 
 # Create symlinks if needed
 if command -v fdfind &> /dev/null && ! command -v fd &> /dev/null; then
-    sudo ln -s $(which fd-find) /usr/local/bin/fd || echo "Failed to create symlink for fd, but continuing..."
+    sudo ln -s $(which fdfind) /usr/local/bin/fd || echo "Failed to create symlink for fd, but continuing..."
 fi
 
 if command -v batcat &> /dev/null && ! command -v bat &> /dev/null; then
