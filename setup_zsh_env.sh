@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Remove 'set -e' to prevent the script from stopping on errors
-# set -e
+set -e
 
 # Ensure the script is run with sudo
 if [ "$EUID" -ne 0 ]; then
