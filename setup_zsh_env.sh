@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Remove 'set -e' to prevent the script from stopping on errors
-set -e
+# set -e
 
 # Ensure the script is run with sudo
 if [ "$EUID" -ne 0 ]; then
@@ -22,17 +22,25 @@ CORRECT_HOME="/home/$CORRECT_USER"
 echo "Setting up environment for user: $CORRECT_USER"
 echo "Home directory: $CORRECT_HOME"
 
-# Determine the package manager
-if command -v brew &> /dev/null; then
-    PKG_MANAGER="brew"
-elif command -v apt-get &> /dev/null; then
+# Determine the package manager and run update/upgrade
+if command -v apt-get &> /dev/null; then
     PKG_MANAGER="apt-get"
+    echo "Updating and upgrading system packages..."
+    sudo apt-get update && sudo apt-get upgrade -y
 elif command -v dnf &> /dev/null; then
     PKG_MANAGER="dnf"
+    echo "Updating and upgrading system packages..."
+    sudo dnf upgrade -y
 elif command -v yum &> /dev/null; then
     PKG_MANAGER="yum"
+    echo "Updating and upgrading system packages..."
+    sudo yum update -y
+elif command -v brew &> /dev/null; then
+    PKG_MANAGER="brew"
+    echo "Updating Homebrew and upgrading packages..."
+    brew update && brew upgrade
 else
-    echo "No supported package manager found. Will attempt manual installation for some packages."
+    echo "No supported package manager found. Skipping system update and upgrade."
     PKG_MANAGER="manual"
 fi
 
@@ -56,7 +64,7 @@ install_if_not_installed() {
         echo "Installing $package..."
         case "$PKG_MANAGER" in
             apt-get)
-                sudo $PKG_MANAGER update && sudo $PKG_MANAGER install -y "$package" || { echo "Failed to install $package"; return 1; }
+                sudo $PKG_MANAGER install -y "$package" || { echo "Failed to install $package"; return 1; }
                 ;;
             dnf|yum)
                 sudo $PKG_MANAGER install -y "$package" || { echo "Failed to install $package"; return 1; }
@@ -82,16 +90,16 @@ if ! command -v zoxide &> /dev/null; then
     if [ -f "$ZOXIDE_INSTALL_SCRIPT" ]; then
         chmod +x "$ZOXIDE_INSTALL_SCRIPT"
         chown "$CORRECT_USER:$CORRECT_USER" "$ZOXIDE_INSTALL_SCRIPT"
-        
+
         # Modify the install script to use the correct installation directory
         sed -i 's|PREFIX=.*|PREFIX="$HOME/.local"|' "$ZOXIDE_INSTALL_SCRIPT"
-        
+
         # Run the install script as the correct user
         sh -c "HOME=$CORRECT_HOME $ZOXIDE_INSTALL_SCRIPT" || { echo "Failed to install zoxide"; }
-        
+
         # Clean up
         rm "$ZOXIDE_INSTALL_SCRIPT"
-        
+
         echo "zoxide installation attempted."
     else
         echo "Zoxide install script not found. Skipping zoxide installation."
@@ -159,7 +167,7 @@ if ! command -v fzf &> /dev/null; then
     else
         echo "fzf directory already exists. Skipping clone."
     fi
-    
+
     if [ -d "$CORRECT_HOME/.fzf" ]; then
         chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.fzf" || { echo "Failed to change ownership of $CORRECT_HOME/.fzf"; }
         sudo -u "$CORRECT_USER" "$CORRECT_HOME/.fzf/install" --all || { echo "Failed to run fzf install script"; }
@@ -192,7 +200,7 @@ fi
 install_eza() {
     if ! command -v eza &> /dev/null; then
         echo "Installing eza..."
-        
+
         # Determine system architecture
         ARCH=$(uname -m)
         case "$ARCH" in
