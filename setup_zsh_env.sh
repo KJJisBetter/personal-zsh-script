@@ -78,6 +78,9 @@ install_if_not_installed() {
     fi
 }
 
+# Install git if not present
+install_if_not_installed git || echo "Failed to install git"
+
 # Install zsh and unzip
 install_if_not_installed zsh || echo "Failed to install zsh, but continuing..."
 install_if_not_installed unzip || echo "Failed to install unzip, but continuing..."
