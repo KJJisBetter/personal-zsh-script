@@ -7,7 +7,7 @@ This repository contains a shell script that sets up a customized Zsh environmen
 To use this script, run the following command:
 
 ```sh
-curl -sSL https://raw.githubusercontent.com/KJIsBetter/personal-zsh-script/main/setup_zsh_env.sh | sudo sh
+curl -sSL https://raw.githubusercontent.com/KJJIsBetter/personal-zsh-script/master/setup_zsh_env.sh | sudo sh
 ```
 
 **Note:** Always review scripts before running them with sudo privileges.
