@@ -1,7 +1,5 @@
 #!/bin/bash
-
-# Remove 'set -e' to prevent the script from stopping on errors
-# set -e
+set -e
 
 # Ensure the script is run with sudo
 if [ "$EUID" -ne 0 ]; then
@@ -22,19 +20,19 @@ CORRECT_HOME="/home/$CORRECT_USER"
 echo "Setting up environment for user: $CORRECT_USER"
 echo "Home directory: $CORRECT_HOME"
 
-# Determine the package manager and run update/upgrade
+# Determine the package manager and run update/upgrade (we are root, so no sudo needed)
 if command -v apt-get &> /dev/null; then
     PKG_MANAGER="apt-get"
     echo "Updating and upgrading system packages..."
-    sudo apt-get update && sudo apt-get upgrade -y
+    apt-get update && apt-get upgrade -y
 elif command -v dnf &> /dev/null; then
     PKG_MANAGER="dnf"
     echo "Updating and upgrading system packages..."
-    sudo dnf upgrade -y
+    dnf upgrade -y
 elif command -v yum &> /dev/null; then
     PKG_MANAGER="yum"
     echo "Updating and upgrading system packages..."
-    sudo yum update -y
+    yum update -y
 elif command -v brew &> /dev/null; then
     PKG_MANAGER="brew"
     echo "Updating Homebrew and upgrading packages..."
@@ -56,18 +54,23 @@ check_and_create_dir() {
     fi
 }
 
-# Function to install a package if it's not already installed
+# Function to install a package if it's not already installed.
+# Usage: install_if_not_installed <package> [command_name]
+# If command_name is omitted, it defaults to package (for "command -v" check).
 install_if_not_installed() {
     local package="$1"
-    local command_name="$2"
+    local command_name="${2:-$1}"
     if ! command -v "$command_name" &> /dev/null; then
         echo "Installing $package..."
         case "$PKG_MANAGER" in
             apt-get)
-                sudo $PKG_MANAGER install -y "$package" || { echo "Failed to install $package"; return 1; }
+                apt-get install -y "$package" || { echo "Failed to install $package"; return 1; }
                 ;;
             dnf|yum)
-                sudo $PKG_MANAGER install -y "$package" || { echo "Failed to install $package"; return 1; }
+                $PKG_MANAGER install -y "$package" || { echo "Failed to install $package"; return 1; }
+                ;;
+            brew)
+                brew install "$package" || { echo "Failed to install $package"; return 1; }
                 ;;
             *)
                 echo "Please install $package manually."
@@ -79,11 +82,11 @@ install_if_not_installed() {
 }
 
 # Install git if not present
-install_if_not_installed git || echo "Failed to install git"
+install_if_not_installed git || { echo "Failed to install git"; true; }
 
 # Install zsh and unzip
-install_if_not_installed zsh || echo "Failed to install zsh, but continuing..."
-install_if_not_installed unzip || echo "Failed to install unzip, but continuing..."
+install_if_not_installed zsh || { echo "Failed to install zsh, but continuing..."; true; }
+install_if_not_installed unzip || { echo "Failed to install unzip, but continuing..."; true; }
 
 # Install zoxide
 if ! command -v zoxide &> /dev/null; then
@@ -114,7 +117,7 @@ fi
 # Install Oh My Posh
 if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
-    check_and_create_dir $CORRECT_HOME/.local/bin
+    check_and_create_dir "$CORRECT_HOME/.local/bin"
     curl -s https://ohmyposh.dev/install.sh | bash -s -- -d "$CORRECT_HOME/.local/bin" || { echo "Failed to install Oh My Posh"; }
     chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local/bin" || { echo "Failed to change ownership of $CORRECT_HOME/.local/bin"; }
 fi
@@ -133,34 +136,44 @@ else
     echo "Zen theme already exists at $ZEN_THEME_PATH"
 fi
 
-# Install fd-find
+# Install fd (package name differs: fd-find on apt/dnf, fd on brew; binary fdfind on Debian, fd on brew)
 case "$PKG_MANAGER" in
-    apt-get)
-        install_if_not_installed fd-find || echo "Failed to install fd-find, but continuing..."
+    apt-get|dnf|yum)
+        install_if_not_installed fd-find fdfind || { echo "Failed to install fd-find, but continuing..."; true; }
         ;;
-    dnf|yum)
-        install_if_not_installed fd-find || echo "Failed to install fd-find, but continuing..."
+    brew)
+        install_if_not_installed fd || { echo "Failed to install fd, but continuing..."; true; }
         ;;
     *)
-        echo "Please install fd-find manually."
+        echo "Please install fd (or fd-find) manually."
         ;;
 esac
 
-# Install bat
-install_if_not_installed bat || echo "Failed to install bat, but continuing..."
+# Install bat (Debian/Ubuntu: binary is batcat; brew: binary is bat)
+case "$PKG_MANAGER" in
+    apt-get|dnf|yum)
+        install_if_not_installed bat batcat || { echo "Failed to install bat, but continuing..."; true; }
+        ;;
+    brew)
+        install_if_not_installed bat bat || { echo "Failed to install bat, but continuing..."; true; }
+        ;;
+    *)
+        install_if_not_installed bat bat || { echo "Please install bat manually."; true; }
+        ;;
+esac
 
 # Create symlinks if needed
 if command -v fdfind &> /dev/null && ! command -v fd &> /dev/null; then
-    sudo ln -s $(which fdfind) /usr/local/bin/fd || echo "Failed to create symlink for fd, but continuing..."
+    ln -s "$(which fdfind)" /usr/local/bin/fd || { echo "Failed to create symlink for fd, but continuing..."; true; }
 fi
 
 if command -v batcat &> /dev/null && ! command -v bat &> /dev/null; then
-    sudo ln -s $(which batcat) /usr/local/bin/bat || echo "Failed to create symlink for bat, but continuing..."
+    ln -s "$(which batcat)" /usr/local/bin/bat || { echo "Failed to create symlink for bat, but continuing..."; true; }
 fi
 
 # Ensure correct ownership of user directories
-chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local" || echo "Failed to change ownership of $CORRECT_HOME/.local"
-chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.config" || echo "Failed to change ownership of $CORRECT_HOME/.config"
+chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local" || true
+chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.config" || true
 
 # Install fzf
 if ! command -v fzf &> /dev/null; then
@@ -173,7 +186,7 @@ if ! command -v fzf &> /dev/null; then
 
     if [ -d "$CORRECT_HOME/.fzf" ]; then
         chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.fzf" || { echo "Failed to change ownership of $CORRECT_HOME/.fzf"; }
-        sudo -u "$CORRECT_USER" "$CORRECT_HOME/.fzf/install" --all || { echo "Failed to run fzf install script"; }
+        sudo -u "$CORRECT_USER" "$CORRECT_HOME/.fzf/install" --all || { echo "Failed to run fzf install script"; true; }
     else
         echo "fzf directory not found. Skipping installation."
     fi
@@ -210,8 +223,11 @@ install_eza() {
             x86_64)
                 EZA_ARCH="x86_64-unknown-linux-gnu"
                 ;;
-            aarch64)
+            aarch64|arm64)
                 EZA_ARCH="aarch64-unknown-linux-gnu"
+                ;;
+            armv7l|arm)
+                EZA_ARCH="arm-unknown-linux-gnueabihf"
                 ;;
             *)
                 echo "Unsupported architecture: $ARCH"
@@ -219,12 +235,19 @@ install_eza() {
                 ;;
         esac
 
-        # Download and install eza
+        # Download and install eza (tarball may have binary at root or in a subdir).
+        # Checksums (sha256) are published on the GitHub release page for verification.
         TEMP_DIR=$(mktemp -d)
-        wget -c "https://github.com/eza-community/eza/releases/latest/download/eza_${EZA_ARCH}.tar.gz" -O - | tar xz -C "$TEMP_DIR" || { echo "Failed to download or extract eza"; return 1; }
-        chmod +x "$TEMP_DIR/eza" || { echo "Failed to make eza executable"; return 1; }
-        chown root:root "$TEMP_DIR/eza" || { echo "Failed to change ownership of eza"; return 1; }
-        mv "$TEMP_DIR/eza" /usr/local/bin/eza || { echo "Failed to move eza to /usr/local/bin"; return 1; }
+        wget -c "https://github.com/eza-community/eza/releases/latest/download/eza_${EZA_ARCH}.tar.gz" -O - | tar xz -C "$TEMP_DIR" || { echo "Failed to download or extract eza"; rm -rf "$TEMP_DIR"; return 1; }
+        EZA_BIN=$(find "$TEMP_DIR" -name eza -type f 2>/dev/null | head -n1)
+        if [ -z "$EZA_BIN" ] || [ ! -f "$EZA_BIN" ]; then
+            echo "eza binary not found in tarball"
+            rm -rf "$TEMP_DIR"
+            return 1
+        fi
+        chmod +x "$EZA_BIN" || { rm -rf "$TEMP_DIR"; return 1; }
+        chown root:root "$EZA_BIN" || { rm -rf "$TEMP_DIR"; return 1; }
+        mv "$EZA_BIN" /usr/local/bin/eza || { rm -rf "$TEMP_DIR"; return 1; }
         rm -rf "$TEMP_DIR"
 
         # Create symlink for exa compatibility
@@ -240,8 +263,8 @@ install_eza() {
     fi
 }
 
-# Call the function to install eza
-install_eza || echo "Failed to install eza, but continuing..."
+# Call the function to install eza (optional)
+install_eza || { echo "Failed to install eza, but continuing..."; true; }
 
 # Ensure .zshrc exists and has correct permissions
 ZSHRC="$CORRECT_HOME/.zshrc"
@@ -249,10 +272,21 @@ touch "$ZSHRC" || { echo "Failed to create .zshrc file"; }
 chown "$CORRECT_USER:$CORRECT_USER" "$ZSHRC" || { echo "Failed to change ownership of .zshrc"; }
 chmod 644 "$ZSHRC" || { echo "Failed to set permissions for .zshrc"; }
 
-# Function to safely append configurations to .zshrc
-append_to_zshrc() {
+# Marker for our injected block (idempotent: re-run replaces block instead of duplicating)
+ZSHRC_MARKER_START="# --- personal-zsh-script block ---"
+
+# Function to write .zshrc block idempotently: replace existing block or append
+write_zshrc_block() {
     local content="$1"
-    echo "$content" | sudo -u "$CORRECT_USER" tee -a "$ZSHRC" > /dev/null || { echo "Failed to append content to .zshrc"; }
+    if grep -q "^${ZSHRC_MARKER_START}$" "$ZSHRC" 2>/dev/null; then
+        # Replace from marker to end of file with new content
+        sed -i "/^${ZSHRC_MARKER_START}$/,\$d" "$ZSHRC" || { echo "Failed to remove old block from .zshrc"; return 1; }
+        echo "$ZSHRC_MARKER_START" | sudo -u "$CORRECT_USER" tee -a "$ZSHRC" > /dev/null || return 1
+        echo "$content" | sudo -u "$CORRECT_USER" tee -a "$ZSHRC" > /dev/null || { echo "Failed to write content to .zshrc"; return 1; }
+    else
+        echo "$ZSHRC_MARKER_START" | sudo -u "$CORRECT_USER" tee -a "$ZSHRC" > /dev/null || return 1
+        echo "$content" | sudo -u "$CORRECT_USER" tee -a "$ZSHRC" > /dev/null || { echo "Failed to append content to .zshrc"; return 1; }
+    fi
 }
 
 # Add your zshrc content here
@@ -285,7 +319,8 @@ zinit light Aloxaf/fzf-tab
 # Add in snippets
 zinit snippet OMZP::git
 zinit snippet OMZP::sudo
-zinit snippet OMZP::archlinux
+# Arch Linux helpers (only on Arch)
+[[ -f /etc/arch-release ]] && zinit snippet OMZP::archlinux
 zinit snippet OMZP::aws
 zinit snippet OMZP::kubectl
 zinit snippet OMZP::kubectx
@@ -330,10 +365,9 @@ export PATH="$HOME/.fzf/bin:$PATH"
 export PATH="/usr/local/bin:$PATH"
 export PATH="/usr/bin:$PATH"
 export PATH="/bin:$PATH"
-export PATH="/.local/bin:$PATH"
 
 # FZF configuration
-[ -f $HOME/.fzf.zsh ] && source $HOME/.fzf.zsh
+[ -f "$HOME/.fzf.zsh" ] && source "$HOME/.fzf.zsh"
 
 export FZF_DEFAULT_COMMAND="fd --type f --hidden --follow --exclude .git"
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
@@ -354,24 +388,24 @@ _fzf_compgen_dir() {
 }
 
 # Source fzf-git script
-source $HOME/.fzf-git/fzf-git.sh
+source "$HOME/.fzf-git/fzf-git.sh"
 
 # Shell integration
 eval "$(zoxide init zsh)"
 
 # oh my posh customization for zsh
-eval "$(oh-my-posh init zsh --config $HOME/.config/oh-my-posh/themes/zen.toml)"
+eval "$(oh-my-posh init zsh --config "$HOME/.config/oh-my-posh/themes/zen.toml")"
 EOF
 )
 
 # Ensure correct ownership of user directories
-sudo chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local" || { echo "Failed to change ownership of $CORRECT_HOME/.local"; }
-sudo chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.config" || { echo "Failed to change ownership of $CORRECT_HOME/.config"; }
-sudo chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.fzf" || { echo "Failed to change ownership of $CORRECT_HOME/.fzf"; }
-sudo chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.fzf-git" || { echo "Failed to change ownership of $CORRECT_HOME/.fzf-git"; }
-sudo chown "$CORRECT_USER:$CORRECT_USER" "$ZSHRC" || { echo "Failed to change ownership of $ZSHRC"; }
+chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local" || true
+chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.config" || true
+chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.fzf" 2>/dev/null || true
+chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.fzf-git" 2>/dev/null || true
+chown "$CORRECT_USER:$CORRECT_USER" "$ZSHRC" || true
 
-append_to_zshrc "$zshrc_content"
+write_zshrc_block "$zshrc_content"
 
 # Final check and instructions
 if [ -f "$ZSHRC" ] && [ -d "$CORRECT_HOME/.local" ] && [ -d "$CORRECT_HOME/.config" ]; then

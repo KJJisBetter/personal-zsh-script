@@ -4,13 +4,15 @@ This repository contains a shell script that sets up a customized Zsh environmen
 
 ## Quick Start
 
-To use this script, run the following command:
+**Recommended (download, review, then run):**
 
 ```sh
-curl -sSL https://raw.githubusercontent.com/KJJIsBetter/personal-zsh-script/master/setup_zsh_env.sh | sudo sh
+curl -sSL -o setup_zsh_env.sh https://raw.githubusercontent.com/KJJIsBetter/personal-zsh-script/master/setup_zsh_env.sh
+# Review the script before running with sudo
+sudo ./setup_zsh_env.sh
 ```
 
-**Note:** Always review scripts before running them with sudo privileges.
+Piping a remote script directly into `sudo sh` is unsafe (no local copy to review; a partial download could run incomplete code). Prefer the above so you can inspect the script first.
 
 After the script finishes, **use Zsh** so your new config is loaded. Do one of the following:
 
@@ -46,7 +48,9 @@ This script automates the setup of a Zsh environment with several useful tools a
    - Aliases for common commands
    - FZF integration for enhanced searching
 
-4. **Theme Setup:** Installs the Zen theme for Oh My Posh.
+4. **Theme Setup:** Installs the Zen theme for Oh My Posh (from [dreamsofautonomy/zen-omp](https://github.com/dreamsofautonomy/zen-omp)).
+
+The script uses [Zinit](https://github.com/zdharma-continuum/zinit) (zdharma-continuum/zinit) as the Zsh plugin manager and [Oh My Posh](https://ohmyposh.dev/) for the prompt. Re-running the script is idempotent: it replaces its own block in `.zshrc` instead of appending a duplicate. On Arch Linux, the Arch-specific Oh My Zsh snippet is loaded; on other distros it is skipped.
 
 ## Why These Choices?
 
@@ -56,6 +60,8 @@ This script automates the setup of a Zsh environment with several useful tools a
 - **fzf:** Enhances search capabilities in the command line.
 - **fd-find & bat:** Modern alternatives to find and cat with improved functionality.
 - **eza:** A more feature-rich and colorful alternative to the ls command.
+
+The fzf installer is run with `--all`, so keybindings and completion are set up for all supported shells (Bash, Zsh, etc.). If you prefer Zsh only, you can re-run `~/.fzf/install` with the appropriate flags after setup.
 
 ## Customization
 
