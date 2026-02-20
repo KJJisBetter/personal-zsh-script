@@ -8,9 +8,12 @@ This repository contains a shell script that sets up a customized Zsh environmen
 
 ```sh
 curl -sSL -o setup_zsh_env.sh https://raw.githubusercontent.com/KJJIsBetter/personal-zsh-script/master/setup_zsh_env.sh
+chmod +x setup_zsh_env.sh   # required when downloading (e.g. curl or GitHub zip); clones usually get the bit already
 # Review the script before running with sudo
 sudo ./setup_zsh_env.sh
 ```
+
+If you clone the repo with Git, the script is usually executable already; on Ubuntu, if you get "Permission denied", run `chmod +x setup_zsh_env.sh` once.
 
 Piping a remote script directly into `sudo sh` is unsafe (no local copy to review; a partial download could run incomplete code). Prefer the above so you can inspect the script first.
 
