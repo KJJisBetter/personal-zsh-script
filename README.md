@@ -12,6 +12,17 @@ curl -sSL https://raw.githubusercontent.com/KJJIsBetter/personal-zsh-script/mast
 
 **Note:** Always review scripts before running them with sudo privileges.
 
+After the script finishes, **use Zsh** so your new config is loaded. Do one of the following:
+
+- **Option A:** Run `zsh` in the same terminal (Zsh will automatically load `.zshrc`).
+- **Option B:** Open a new terminal; if Zsh is already your default shell, it will load automatically.
+- **Option C:** Make Zsh your default shell, then log out and back in:
+  ```sh
+  chsh -s $(which zsh)
+  ```
+
+**Do not** run `source .zshrc` from Bash—`.zshrc` is for Zsh only and will fail in Bash.
+
 ## What This Script Does
 
 This script automates the setup of a Zsh environment with several useful tools and configurations:

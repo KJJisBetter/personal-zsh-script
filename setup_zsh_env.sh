@@ -373,11 +373,17 @@ sudo chown "$CORRECT_USER:$CORRECT_USER" "$ZSHRC" || { echo "Failed to change ow
 
 append_to_zshrc "$zshrc_content"
 
-echo "Zsh configuration completed for user $CORRECT_USER. Please restart your terminal or source your .zshrc file."
-
-# Final check
+# Final check and instructions
 if [ -f "$ZSHRC" ] && [ -d "$CORRECT_HOME/.local" ] && [ -d "$CORRECT_HOME/.config" ]; then
     echo "Setup completed successfully."
+    echo ""
+    echo "Zsh configuration is ready for user $CORRECT_USER."
+    echo ""
+    echo "To use your new Zsh setup, run Zsh (do NOT run 'source ~/.zshrc' from Bash):"
+    echo "  • Run:     zsh"
+    echo "  • Or set Zsh as default, then log out and back in:"
+    echo "    chsh -s \$(which zsh)"
+    echo ""
 else
     echo "Setup completed with some issues. Please check the output above for any error messages."
 fi
