@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 # Ensure the script is run with sudo
@@ -6,6 +6,9 @@ if [ "$EUID" -ne 0 ]; then
     echo "Please run this script with sudo"
     exit 1
 fi
+
+# Sane PATH when running as root (sudo often strips env, causing "command not found")
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
 # Determine the correct user and home directory
 if [ -n "$SUDO_USER" ]; then
