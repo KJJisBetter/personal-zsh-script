@@ -23,6 +23,24 @@ CORRECT_HOME="/home/$CORRECT_USER"
 echo "Setting up environment for user: $CORRECT_USER"
 echo "Home directory: $CORRECT_HOME"
 
+# Ask whether the environment will mainly be used in Warp terminal (affects themes and autosuggestions)
+USE_WARP=false
+if [ -t 0 ]; then
+    echo ""
+    read -r -p "Will this environment primarily be used in Warp terminal? [y/N] " warp_answer
+    case "${warp_answer:-n}" in
+        [yY]|[yY][eE][sS]) USE_WARP=true ;;
+        *) USE_WARP=false ;;
+    esac
+else
+    echo "Non-interactive run: defaulting to full setup (not Warp-only)."
+fi
+if [ "$USE_WARP" = true ]; then
+    echo "Warp has its own UI and features; the experience won't match a standard terminal."
+    echo "We'll install Warp themes and core tools (no smarter autosuggestions in .zshrc)."
+    echo ""
+fi
+
 # Determine the package manager and run update/upgrade (we are root, so no sudo needed)
 if command -v apt-get &> /dev/null; then
     PKG_MANAGER="apt-get"
@@ -269,6 +287,38 @@ install_eza() {
 # Call the function to install eza (optional)
 install_eza || { echo "Failed to install eza, but continuing..."; true; }
 
+# When user chose Warp: install Warp themes so they can pick one in Warp Settings > Appearance > Theme
+if [ "$USE_WARP" = true ]; then
+    if [ "$(uname -s)" = "Darwin" ]; then
+        WARP_BASE="$CORRECT_HOME/.warp"
+    else
+        WARP_BASE="${XDG_DATA_HOME:-$CORRECT_HOME/.local/share}/warp-terminal"
+    fi
+    WARP_THEMES_DIR="$WARP_BASE/themes"
+    mkdir -p "$WARP_BASE" || { echo "Failed to create Warp base dir"; true; }
+    chown "$CORRECT_USER:$CORRECT_USER" "$WARP_BASE" 2>/dev/null || true
+    if [ ! -d "$WARP_THEMES_DIR/.git" ]; then
+        warp_theme_choice="1"
+        if [ -t 0 ]; then
+            echo ""
+            read -r -p "Install Warp themes? (1) Clone all official themes  (2) Skip [1]: " warp_theme_choice
+            warp_theme_choice="${warp_theme_choice:-1}"
+        fi
+        if [ "$warp_theme_choice" = "1" ]; then
+            echo "Installing Warp themes..."
+            git clone --depth 1 https://github.com/warpdotdev/themes.git "$WARP_THEMES_DIR" || { echo "Failed to clone Warp themes (git may be needed)"; true; }
+            if [ -d "$WARP_THEMES_DIR" ]; then
+                chown -R "$CORRECT_USER:$CORRECT_USER" "$WARP_THEMES_DIR" || true
+                echo "Warp themes installed. Pick a theme in Warp: Settings > Appearance > Theme."
+            fi
+        else
+            echo "Skipping Warp themes install."
+        fi
+    else
+        echo "Warp themes directory already exists. Skipping clone."
+    fi
+fi
+
 # Ensure .zshrc exists and has correct permissions
 ZSHRC="$CORRECT_HOME/.zshrc"
 touch "$ZSHRC" || { echo "Failed to create .zshrc file"; }
@@ -316,6 +366,7 @@ source "${ZINIT_HOME}/zinit.zsh"
 # Add in zsh plugins
 zinit light zsh-users/zsh-syntax-highlighting
 zinit light zsh-users/zsh-completions
+# INJECT_AUTOSUGGEST_HERE
 zinit light zsh-users/zsh-autosuggestions
 zinit light Aloxaf/fzf-tab
 
@@ -400,6 +451,13 @@ eval "$(zoxide init zsh)"
 eval "$(oh-my-posh init zsh --config "$HOME/.config/oh-my-posh/themes/zen.toml")"
 EOF
 )
+
+# Inject smarter autosuggestions config only when not in Warp mode
+if [ "$USE_WARP" = true ]; then
+    zshrc_content="${zshrc_content//# INJECT_AUTOSUGGEST_HERE/}"
+else
+    zshrc_content="${zshrc_content//# INJECT_AUTOSUGGEST_HERE/ZSH_AUTOSUGGEST_STRATEGY=(history completion)}"
+fi
 
 # Ensure correct ownership of user directories
 chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local" || true
