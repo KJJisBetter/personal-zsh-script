@@ -7,7 +7,7 @@ This repository contains a shell script that sets up a customized Zsh environmen
 **Recommended (download, review, then run):**
 
 ```sh
-curl -sSL -o setup_zsh_env.sh https://raw.githubusercontent.com/KJJIsBetter/personal-zsh-script/master/setup_zsh_env.sh
+curl -sSL -o setup_zsh_env.sh https://raw.githubusercontent.com/KJJIsBetter/personal-zsh-script/main/setup_zsh_env.sh
 chmod +x setup_zsh_env.sh   # required when downloading (e.g. curl or GitHub zip); clones usually get the bit already
 # Review the script before running with sudo
 sudo ./setup_zsh_env.sh

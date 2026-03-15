@@ -8,7 +8,8 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Sane PATH when running as root (sudo often strips env, causing "command not found")
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+# Include common Homebrew locations for macOS (especially Apple Silicon /opt/homebrew).
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/homebrew/bin:/opt/homebrew/sbin${PATH:+:$PATH}"
 
 # Determine the correct user and home directory
 if [ -n "$SUDO_USER" ]; then
@@ -18,7 +19,15 @@ else
     exit 1
 fi
 
-CORRECT_HOME="/home/$CORRECT_USER"
+# Determine primary group for the user in a portable way
+CORRECT_GROUP="$(id -gn "$CORRECT_USER" 2>/dev/null || echo "$CORRECT_USER")"
+
+# Resolve the correct home directory in a cross‑platform way (Linux, macOS, etc.)
+CORRECT_HOME="$(eval echo "~$CORRECT_USER")"
+if [ -z "$CORRECT_HOME" ] || [ ! -d "$CORRECT_HOME" ]; then
+    echo "Could not determine home directory for user $CORRECT_USER"
+    exit 1
+fi
 
 echo "Setting up environment for user: $CORRECT_USER"
 echo "Home directory: $CORRECT_HOME"
@@ -63,12 +72,18 @@ else
     PKG_MANAGER="manual"
 fi
 
+# Helper for chown using detected group (works when user and group names differ, e.g. macOS)
+chown_user() {
+    local target="$1"
+    chown "$CORRECT_USER:$CORRECT_GROUP" "$target"
+}
+
 # Function to check and create a directory if it doesn't exist
 check_and_create_dir() {
     local dir_path="$1"
     if [ ! -d "$dir_path" ]; then
         mkdir -p "$dir_path" || { echo "Failed to create directory $dir_path"; return 1; }
-        chown "$CORRECT_USER:$CORRECT_USER" "$dir_path" || { echo "Failed to change ownership of $dir_path"; return 1; }
+        chown_user "$dir_path" || { echo "Failed to change ownership of $dir_path"; return 1; }
         echo "Created directory at $dir_path"
     else
         echo "Directory $dir_path already exists."
@@ -102,6 +117,19 @@ install_if_not_installed() {
     fi
 }
 
+# Portable in-place sed helper (handles GNU sed and BSD/macOS sed)
+portable_sed_inplace() {
+    local expr="$1"
+    local file="$2"
+    if sed --version >/dev/null 2>&1; then
+        # GNU sed
+        sed -i "$expr" "$file"
+    else
+        # BSD/macOS sed (requires empty backup suffix)
+        sed -i '' "$expr" "$file"
+    fi
+}
+
 # Install git if not present
 install_if_not_installed git || { echo "Failed to install git"; true; }
 
@@ -116,10 +144,10 @@ if ! command -v zoxide &> /dev/null; then
     curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh -o "$ZOXIDE_INSTALL_SCRIPT" || { echo "Failed to download zoxide install script"; }
     if [ -f "$ZOXIDE_INSTALL_SCRIPT" ]; then
         chmod +x "$ZOXIDE_INSTALL_SCRIPT"
-        chown "$CORRECT_USER:$CORRECT_USER" "$ZOXIDE_INSTALL_SCRIPT"
+        chown_user "$ZOXIDE_INSTALL_SCRIPT"
 
         # Modify the install script to use the correct installation directory
-        sed -i 's|PREFIX=.*|PREFIX="$HOME/.local"|' "$ZOXIDE_INSTALL_SCRIPT"
+        portable_sed_inplace 's|PREFIX=.*|PREFIX="$HOME/.local"|' "$ZOXIDE_INSTALL_SCRIPT"
 
         # Run the install script as the correct user
         sh -c "HOME=$CORRECT_HOME $ZOXIDE_INSTALL_SCRIPT" || { echo "Failed to install zoxide"; }
@@ -140,7 +168,7 @@ if ! command -v oh-my-posh &> /dev/null; then
     echo "Installing Oh My Posh..."
     check_and_create_dir "$CORRECT_HOME/.local/bin"
     curl -s https://ohmyposh.dev/install.sh | bash -s -- -d "$CORRECT_HOME/.local/bin" || { echo "Failed to install Oh My Posh"; }
-    chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local/bin" || { echo "Failed to change ownership of $CORRECT_HOME/.local/bin"; }
+    chown -R "$CORRECT_USER:$CORRECT_GROUP" "$CORRECT_HOME/.local/bin" || { echo "Failed to change ownership of $CORRECT_HOME/.local/bin"; }
 fi
 
 # Create themes directory and download Zen theme for Oh My Posh
@@ -152,7 +180,7 @@ ZEN_THEME_PATH="$THEMES_DIR/zen.toml"
 if [ ! -f "$ZEN_THEME_PATH" ]; then
     echo "Downloading Zen theme for Oh My Posh..."
     curl -o "$ZEN_THEME_PATH" "$ZEN_THEME_URL" || { echo "Failed to download Zen theme"; }
-    chown "$CORRECT_USER:$CORRECT_USER" "$ZEN_THEME_PATH" || { echo "Failed to change ownership of $ZEN_THEME_PATH"; }
+    chown_user "$ZEN_THEME_PATH" || { echo "Failed to change ownership of $ZEN_THEME_PATH"; }
 else
     echo "Zen theme already exists at $ZEN_THEME_PATH"
 fi
@@ -193,8 +221,8 @@ if command -v batcat &> /dev/null && ! command -v bat &> /dev/null; then
 fi
 
 # Ensure correct ownership of user directories
-chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local" || true
-chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.config" || true
+chown -R "$CORRECT_USER:$CORRECT_GROUP" "$CORRECT_HOME/.local" || true
+chown -R "$CORRECT_USER:$CORRECT_GROUP" "$CORRECT_HOME/.config" || true
 
 # Install fzf
 if ! command -v fzf &> /dev/null; then
@@ -206,7 +234,7 @@ if ! command -v fzf &> /dev/null; then
     fi
 
     if [ -d "$CORRECT_HOME/.fzf" ]; then
-        chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.fzf" || { echo "Failed to change ownership of $CORRECT_HOME/.fzf"; }
+        chown -R "$CORRECT_USER:$CORRECT_GROUP" "$CORRECT_HOME/.fzf" || { echo "Failed to change ownership of $CORRECT_HOME/.fzf"; }
         sudo -u "$CORRECT_USER" "$CORRECT_HOME/.fzf/install" --all || { echo "Failed to run fzf install script"; true; }
     else
         echo "fzf directory not found. Skipping installation."
@@ -220,7 +248,7 @@ ZINIT_HOME="${XDG_DATA_HOME:-${CORRECT_HOME}/.local/share}/zinit/zinit.git"
 if [ ! -d "$ZINIT_HOME" ]; then
     mkdir -p "$(dirname "$ZINIT_HOME")" || { echo "Failed to create Zinit directory"; }
     git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME" || { echo "Failed to clone Zinit repository"; }
-    chown -R "$CORRECT_USER:$CORRECT_USER" "$(dirname "$ZINIT_HOME")" || { echo "Failed to change ownership of Zinit directory"; }
+    chown -R "$CORRECT_USER:$CORRECT_GROUP" "$(dirname "$ZINIT_HOME")" || { echo "Failed to change ownership of Zinit directory"; }
 else
     echo "Zinit is already installed."
 fi
@@ -229,59 +257,75 @@ fi
 FZF_GIT_DIR="$CORRECT_HOME/.fzf-git"
 if [ ! -d "$FZF_GIT_DIR" ]; then
     git clone https://github.com/junegunn/fzf-git.sh.git "$FZF_GIT_DIR" || { echo "Failed to clone fzf-git repository"; }
-    chown -R "$CORRECT_USER:$CORRECT_USER" "$FZF_GIT_DIR" || { echo "Failed to change ownership of $FZF_GIT_DIR"; }
+    chown -R "$CORRECT_USER:$CORRECT_GROUP" "$FZF_GIT_DIR" || { echo "Failed to change ownership of $FZF_GIT_DIR"; }
 else
     echo "fzf-git is already installed."
 fi
 
 install_eza() {
-    if ! command -v eza &> /dev/null; then
-        echo "Installing eza..."
-
-        # Determine system architecture
-        ARCH=$(uname -m)
-        case "$ARCH" in
-            x86_64)
-                EZA_ARCH="x86_64-unknown-linux-gnu"
-                ;;
-            aarch64|arm64)
-                EZA_ARCH="aarch64-unknown-linux-gnu"
-                ;;
-            armv7l|arm)
-                EZA_ARCH="arm-unknown-linux-gnueabihf"
-                ;;
-            *)
-                echo "Unsupported architecture: $ARCH"
-                return 1
-                ;;
-        esac
-
-        # Download and install eza (tarball may have binary at root or in a subdir).
-        # Checksums (sha256) are published on the GitHub release page for verification.
-        TEMP_DIR=$(mktemp -d)
-        wget -c "https://github.com/eza-community/eza/releases/latest/download/eza_${EZA_ARCH}.tar.gz" -O - | tar xz -C "$TEMP_DIR" || { echo "Failed to download or extract eza"; rm -rf "$TEMP_DIR"; return 1; }
-        EZA_BIN=$(find "$TEMP_DIR" -name eza -type f 2>/dev/null | head -n1)
-        if [ -z "$EZA_BIN" ] || [ ! -f "$EZA_BIN" ]; then
-            echo "eza binary not found in tarball"
-            rm -rf "$TEMP_DIR"
-            return 1
-        fi
-        chmod +x "$EZA_BIN" || { rm -rf "$TEMP_DIR"; return 1; }
-        chown root:root "$EZA_BIN" || { rm -rf "$TEMP_DIR"; return 1; }
-        mv "$EZA_BIN" /usr/local/bin/eza || { rm -rf "$TEMP_DIR"; return 1; }
-        rm -rf "$TEMP_DIR"
-
-        # Create symlink for exa compatibility
-        if command -v exa &> /dev/null; then
-            echo "Replacing exa with eza..."
-            rm -f /usr/local/bin/exa
-            ln -s /usr/local/bin/eza /usr/local/bin/exa || { echo "Failed to create symlink for exa"; }
-        fi
-
-        echo "eza installation attempted."
-    else
+    if command -v eza &> /dev/null; then
         echo "eza is already installed."
+        return 0
     fi
+
+    echo "Installing eza..."
+    OS_NAME="$(uname -s)"
+
+    # Prefer Homebrew when available (common on macOS)
+    if command -v brew &> /dev/null; then
+        brew install eza || { echo "Failed to install eza via Homebrew, but continuing..."; return 1; }
+        return 0
+    fi
+
+    # Fallback to Linux tarball install when no package manager is detected
+    if [ "$PKG_MANAGER" = "apt-get" ] || [ "$PKG_MANAGER" = "dnf" ] || [ "$PKG_MANAGER" = "yum" ]; then
+        # Try native package first if available
+        install_if_not_installed eza eza || true
+        if command -v eza &> /dev/null; then
+            return 0
+        fi
+    fi
+
+    # Direct download method (mainly for generic Linux)
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64)
+            EZA_ARCH="x86_64-unknown-linux-gnu"
+            ;;
+        aarch64|arm64)
+            EZA_ARCH="aarch64-unknown-linux-gnu"
+            ;;
+        armv7l|arm)
+            EZA_ARCH="arm-unknown-linux-gnueabihf"
+            ;;
+        *)
+            echo "Unsupported architecture for direct eza install: $ARCH"
+            return 1
+            ;;
+    esac
+
+    TEMP_DIR=$(mktemp -d)
+    curl -L "https://github.com/eza-community/eza/releases/latest/download/eza_${EZA_ARCH}.tar.gz" | tar xz -C "$TEMP_DIR" || { echo "Failed to download or extract eza"; rm -rf "$TEMP_DIR"; return 1; }
+    EZA_BIN=$(find "$TEMP_DIR" -name eza -type f 2>/dev/null | head -n1)
+    if [ -z "$EZA_BIN" ] || [ ! -f "$EZA_BIN" ]; then
+        echo "eza binary not found in tarball"
+        rm -rf "$TEMP_DIR"
+        return 1
+    fi
+
+    chmod +x "$EZA_BIN" || { rm -rf "$TEMP_DIR"; return 1; }
+    chown root:root "$EZA_BIN" || { rm -rf "$TEMP_DIR"; return 1; }
+    mv "$EZA_BIN" /usr/local/bin/eza || { rm -rf "$TEMP_DIR"; return 1; }
+    rm -rf "$TEMP_DIR"
+
+    # Create symlink for exa compatibility
+    if command -v exa &> /dev/null; then
+        echo "Replacing exa with eza..."
+        rm -f /usr/local/bin/exa
+        ln -s /usr/local/bin/eza /usr/local/bin/exa || { echo "Failed to create symlink for exa"; }
+    fi
+
+    echo "eza installation attempted."
 }
 
 # Call the function to install eza (optional)
@@ -322,8 +366,13 @@ fi
 # Ensure .zshrc exists and has correct permissions
 ZSHRC="$CORRECT_HOME/.zshrc"
 touch "$ZSHRC" || { echo "Failed to create .zshrc file"; }
-chown "$CORRECT_USER:$CORRECT_USER" "$ZSHRC" || { echo "Failed to change ownership of .zshrc"; }
+chown_user "$ZSHRC" || { echo "Failed to change ownership of .zshrc"; }
 chmod 644 "$ZSHRC" || { echo "Failed to set permissions for .zshrc"; }
+
+# Make sure cache directories exist and are owned by the user (zinit & oh-my-posh use these)
+check_and_create_dir "$CORRECT_HOME/.cache"
+check_and_create_dir "$CORRECT_HOME/.cache/zinit"
+check_and_create_dir "$CORRECT_HOME/.cache/oh-my-posh"
 
 # Marker for our injected block (idempotent: re-run replaces block instead of duplicating)
 ZSHRC_MARKER_START="# --- personal-zsh-script block ---"
@@ -333,7 +382,7 @@ write_zshrc_block() {
     local content="$1"
     if grep -q "^${ZSHRC_MARKER_START}$" "$ZSHRC" 2>/dev/null; then
         # Replace from marker to end of file with new content
-        sed -i "/^${ZSHRC_MARKER_START}$/,\$d" "$ZSHRC" || { echo "Failed to remove old block from .zshrc"; return 1; }
+        portable_sed_inplace "/^${ZSHRC_MARKER_START}$/,\$d" "$ZSHRC" || { echo "Failed to remove old block from .zshrc"; return 1; }
         echo "$ZSHRC_MARKER_START" | sudo -u "$CORRECT_USER" tee -a "$ZSHRC" > /dev/null || return 1
         echo "$content" | sudo -u "$CORRECT_USER" tee -a "$ZSHRC" > /dev/null || { echo "Failed to write content to .zshrc"; return 1; }
     else
@@ -410,8 +459,12 @@ zstyle ':completion:*' menu no
 zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza --tree --color=always {} | head -200'
 zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --tree --color=always {} | head -200'
 
-# Aliases
-alias ls="eza --color=always --long --git --no-filesize --icons=always --no-time --no-user --no-permissions"
+# Aliases (fallback to plain ls if eza is not installed)
+if command -v eza >/dev/null 2>&1; then
+  alias ls="eza --color=always --long --git --no-filesize --icons=always --no-time --no-user --no-permissions"
+else
+  alias ls="ls -GF"
+fi
 
 # PATHS
 export PATH="$HOME/.local/bin:$PATH"
@@ -459,12 +512,13 @@ else
     zshrc_content="${zshrc_content//# INJECT_AUTOSUGGEST_HERE/ZSH_AUTOSUGGEST_STRATEGY=(history completion)}"
 fi
 
-# Ensure correct ownership of user directories
-chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.local" || true
-chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.config" || true
-chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.fzf" 2>/dev/null || true
-chown -R "$CORRECT_USER:$CORRECT_USER" "$CORRECT_HOME/.fzf-git" 2>/dev/null || true
-chown "$CORRECT_USER:$CORRECT_USER" "$ZSHRC" || true
+# Ensure correct ownership of user directories (including caches created by root during setup)
+chown -R "$CORRECT_USER:$CORRECT_GROUP" "$CORRECT_HOME/.local" 2>/dev/null || true
+chown -R "$CORRECT_USER:$CORRECT_GROUP" "$CORRECT_HOME/.config" 2>/dev/null || true
+chown -R "$CORRECT_USER:$CORRECT_GROUP" "$CORRECT_HOME/.fzf" 2>/dev/null || true
+chown -R "$CORRECT_USER:$CORRECT_GROUP" "$CORRECT_HOME/.fzf-git" 2>/dev/null || true
+chown -R "$CORRECT_USER:$CORRECT_GROUP" "$CORRECT_HOME/.cache" 2>/dev/null || true
+chown "$CORRECT_USER:$CORRECT_GROUP" "$ZSHRC" 2>/dev/null || true
 
 write_zshrc_block "$zshrc_content"
 
